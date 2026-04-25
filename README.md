@@ -73,9 +73,6 @@ python login.py login -u 账号 -p 密码 --url http://网关 --ac-id 143
 
 说明账号已经登录成功，无需重复登录。
 
-### 4. "auth_info_error"
-
-这是服务器返回的"用户已在线"状态，表示登录成功。
 
 ## 认证流程
 
