@@ -39,6 +39,11 @@ public partial class MainForm : Form
     {
         InitializeComponent();
         LoadConfig();
+        // 延迟设置焦点，等待所有控件加载完成
+        BeginInvoke(new Action(() =>
+        {
+            _hiddenFocus.Focus();
+        }));
     }
 
     private void InitializeComponent()
@@ -190,7 +195,6 @@ public partial class MainForm : Form
             Visible = false
         };
         Controls.Add(_hiddenFocus);
-        _hiddenFocus.Focus();
     }
 
     private void LoadConfig()
