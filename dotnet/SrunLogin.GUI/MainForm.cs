@@ -187,6 +187,9 @@ public partial class MainForm : Form
             lblAcIdNote, lblDomain, _txtDomain, _chkSaveConfig,
             _btnLogin, _btnInfo, _btnLogout, lblOutput, _txtOutput
         });
+
+        // 将焦点设置到保存配置复选框，避免文本框获得焦点导致占位符消失
+        _chkSaveConfig.Focus();
     }
 
     private void LoadConfig()
