@@ -75,7 +75,7 @@ public partial class MainForm : Form
     private void InitializeComponent()
     {
         Text = "校园网认证工具";
-        Size = new Size(550, 650);
+        Size = new Size(580, 610);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -91,21 +91,21 @@ public partial class MainForm : Form
 
         // 网关地址
         var lblUrl = new Label { Text = "网关地址:", Location = new Point(20, 60), Size = new Size(90, 20) };
-        _txtUrl = CreatePlaceholderTextBox(115, 58, 350, 22, "http://10.0.0.1");
+        _txtUrl = CreatePlaceholderTextBox(115, 58, 420, 22, "http://10.0.0.1");
 
         // 用户名
         var lblUser = new Label { Text = "用户名:", Location = new Point(20, 90), Size = new Size(90, 20) };
-        _txtUsername = CreatePlaceholderTextBox(115, 88, 200, 22, "请输入用户名");
+        _txtUsername = CreatePlaceholderTextBox(115, 88, 420, 22, "请输入用户名");
 
         // 密码
         var lblPwd = new Label { Text = "密码:", Location = new Point(20, 120), Size = new Size(90, 20) };
-        _txtPassword = CreatePlaceholderTextBox(115, 118, 200, 22, "请输入密码");
+        _txtPassword = CreatePlaceholderTextBox(115, 118, 340, 22, "请输入密码");
         _txtPassword.UseSystemPasswordChar = true;
 
         _chkShowPassword = new CheckBox
         {
             Text = "显示",
-            Location = new Point(320, 118),
+            Location = new Point(460, 118),
             Size = new Size(60, 20),
             FlatStyle = FlatStyle.Flat
         };
@@ -116,22 +116,22 @@ public partial class MainForm : Form
 
         // IP地址
         var lblIp = new Label { Text = "IP地址:", Location = new Point(20, 150), Size = new Size(90, 20) };
-        _txtIp = CreatePlaceholderTextBox(115, 148, 130, 22, "留空自动获取");
+        _txtIp = CreatePlaceholderTextBox(115, 148, 150, 22, "留空自动获取");
 
         // AC_ID
-        var lblAcId = new Label { Text = "AC ID:", Location = new Point(260, 150), Size = new Size(55, 20) };
-        _txtAcId = CreatePlaceholderTextBox(320, 148, 145, 22, "留空自动获取");
+        var lblAcId = new Label { Text = "AC ID:", Location = new Point(280, 150), Size = new Size(55, 20) };
+        _txtAcId = CreatePlaceholderTextBox(340, 148, 195, 22, "留空自动获取");
 
         // 域
-        var lblDomain = new Label { Text = "域:", Location = new Point(20, 210), Size = new Size(90, 20) };
-        _txtDomain = CreatePlaceholderTextBox(115, 208, 150, 22, "@edu.cn");
+        var lblDomain = new Label { Text = "域:", Location = new Point(20, 180), Size = new Size(90, 20) };
+        _txtDomain = CreatePlaceholderTextBox(115, 178, 370, 22, "@edu.cn");
 
         // 保存配置
         _chkSaveConfig = new CheckBox
         {
             Text = "保存配置",
-            Location = new Point(420, 208),
-            Size = new Size(90, 20),
+            Location = new Point(485, 178),
+            Size = new Size(55, 20),
             FlatStyle = FlatStyle.Flat,
             Checked = true
         };
@@ -143,12 +143,15 @@ public partial class MainForm : Form
                 DeleteConfig();
         };
 
-        // 按钮
+        // 按钮（平铺到窗口，相同宽度）
+        const int btnWidth = 120;
+        const int btnSpacing = 10;
+        const int btnStartX = 35;
         _btnLogin = new Button
         {
             Text = "登录",
-            Location = new Point(20, 245),
-            Size = new Size(75, 32),
+            Location = new Point(btnStartX, 220),
+            Size = new Size(btnWidth, 32),
             BackColor = Color.FromArgb(0, 120, 215),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -159,8 +162,8 @@ public partial class MainForm : Form
         _btnInfo = new Button
         {
             Text = "查询状态",
-            Location = new Point(105, 245),
-            Size = new Size(85, 32),
+            Location = new Point(btnStartX + btnWidth + btnSpacing, 220),
+            Size = new Size(btnWidth, 32),
             BackColor = Color.FromArgb(0, 150, 136),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -171,8 +174,8 @@ public partial class MainForm : Form
         _btnLogout = new Button
         {
             Text = "登出",
-            Location = new Point(200, 245),
-            Size = new Size(65, 32),
+            Location = new Point(btnStartX + (btnWidth + btnSpacing) * 2, 220),
+            Size = new Size(btnWidth, 32),
             BackColor = Color.FromArgb(244, 67, 54),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -183,8 +186,8 @@ public partial class MainForm : Form
         var btnHelp = new Button
         {
             Text = "填写帮助",
-            Location = new Point(275, 245),
-            Size = new Size(80, 32),
+            Location = new Point(btnStartX + (btnWidth + btnSpacing) * 3, 220),
+            Size = new Size(btnWidth, 32),
             BackColor = Color.Yellow,
             ForeColor = Color.Black,
             FlatStyle = FlatStyle.Flat,
@@ -193,11 +196,11 @@ public partial class MainForm : Form
         btnHelp.Click += (s, e) => ShowHelp();
 
         // 输出
-        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 285), Size = new Size(100, 20) };
+        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 260), Size = new Size(100, 20) };
         _txtOutput = new RichTextBox
         {
-            Location = new Point(20, 305),
-            Size = new Size(500, 280),
+            Location = new Point(20, 280),
+            Size = new Size(520, 290),
             Multiline = true,
             ReadOnly = true,
             ScrollBars = RichTextBoxScrollBars.Both,
@@ -212,7 +215,7 @@ public partial class MainForm : Form
 
         Controls.AddRange(new Control[]
         {
-            lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, _txtPassword, _chkShowPassword, lblIp, _txtIp, lblAcId, _txtAcId,
+            lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword, _chkShowPassword, lblIp, _txtIp, lblAcId, _txtAcId,
             lblDomain, _txtDomain, _chkSaveConfig,
             _btnLogin, _btnInfo, _btnLogout, btnHelp, lblOutput, _txtOutput
         });
@@ -311,7 +314,13 @@ public partial class MainForm : Form
 密码：校园网密码
 IP地址：本机在校园网中的IP，留空自动获取
 AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指定
-域：部分校园网支持多域认证，如 @edu.cn、@student、@teacher
+域：留空为普通账号，部分校园网支持多域认证，可选：
+  @ct         - 中国电信用户
+  @cm         - 中国移动用户
+  @cu         - 中国联通用户
+  @edu.cn     - 教育网/校园网用户
+  @student    - 学生账号
+  @teacher    - 教师账号
 
 ========== 常见问题 ==========
 1. 无法获取IP → 手动填写IP地址
