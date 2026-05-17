@@ -31,8 +31,8 @@ public partial class MainForm : Form
 
     private void InitializeComponent()
     {
-        Text = "SrunLogin - Campus Network Auth";
-        Size = new Size(550, 500);
+        Text = "校园网认证工具";
+        Size = new Size(550, 520);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -40,27 +40,27 @@ public partial class MainForm : Form
 
         var lblTitle = new Label
         {
-            Text = "Campus Network Login",
-            Font = new Font("Segoe UI", 14, FontStyle.Bold),
+            Text = "校园网登录",
+            Font = new Font("Microsoft YaHei", 14, FontStyle.Bold),
             Location = new Point(20, 15),
-            Size = new Size(300, 30)
+            Size = new Size(200, 30)
         };
 
-        // URL
-        var lblUrl = new Label { Text = "Gateway URL:", Location = new Point(20, 60), Size = new Size(90, 20) };
+        // 网关地址
+        var lblUrl = new Label { Text = "网关地址:", Location = new Point(20, 60), Size = new Size(90, 20) };
         _txtUrl = new TextBox { Location = new Point(115, 58), Size = new Size(350, 22), Text = "http://10.0.0.1" };
 
-        // Username
-        var lblUser = new Label { Text = "Username:", Location = new Point(20, 90), Size = new Size(90, 20) };
+        // 用户名
+        var lblUser = new Label { Text = "用户名:", Location = new Point(20, 90), Size = new Size(90, 20) };
         _txtUsername = new TextBox { Location = new Point(115, 88), Size = new Size(200, 22) };
 
-        // Password
-        var lblPwd = new Label { Text = "Password:", Location = new Point(20, 120), Size = new Size(90, 20) };
+        // 密码
+        var lblPwd = new Label { Text = "密码:", Location = new Point(20, 120), Size = new Size(90, 20) };
         _txtPassword = new TextBox { Location = new Point(115, 118), Size = new Size(200, 22), UseSystemPasswordChar = true };
 
         _chkShowPassword = new CheckBox
         {
-            Text = "Show",
+            Text = "显示",
             Location = new Point(320, 118),
             Size = new Size(60, 20),
             FlatStyle = FlatStyle.Flat
@@ -68,15 +68,15 @@ public partial class MainForm : Form
         _chkShowPassword.CheckedChanged += (s, e) =>
             _txtPassword.UseSystemPasswordChar = !_chkShowPassword.Checked;
 
-        // IP
-        var lblIp = new Label { Text = "IP:", Location = new Point(20, 150), Size = new Size(90, 20) };
+        // IP地址
+        var lblIp = new Label { Text = "IP地址:", Location = new Point(20, 150), Size = new Size(90, 20) };
         _txtIp = new TextBox { Location = new Point(115, 148), Size = new Size(150, 22), Enabled = false };
 
         _chkAutoDetect = new CheckBox
         {
-            Text = "Auto Detect",
+            Text = "自动检测",
             Location = new Point(270, 148),
-            Size = new Size(100, 20),
+            Size = new Size(90, 20),
             Checked = true,
             FlatStyle = FlatStyle.Flat
         };
@@ -86,16 +86,16 @@ public partial class MainForm : Form
         var lblAcId = new Label { Text = "AC ID:", Location = new Point(20, 180), Size = new Size(90, 20) };
         _txtAcId = new TextBox { Location = new Point(115, 178), Size = new Size(100, 22), Enabled = false };
 
-        var lblAcIdNote = new Label { Text = "(Auto detect if empty)", Location = new Point(220, 180), Size = new Size(120, 20), ForeColor = Color.Gray };
+        var lblAcIdNote = new Label { Text = "(留空自动检测)", Location = new Point(220, 180), Size = new Size(100, 20), ForeColor = Color.Gray };
 
-        // Domain
-        var lblDomain = new Label { Text = "Domain:", Location = new Point(20, 210), Size = new Size(90, 20) };
+        // 域
+        var lblDomain = new Label { Text = "域:", Location = new Point(20, 210), Size = new Size(90, 20) };
         _txtDomain = new TextBox { Location = new Point(115, 208), Size = new Size(150, 22) };
 
-        // Buttons
+        // 按钮
         _btnLogin = new Button
         {
-            Text = "Login",
+            Text = "登录",
             Location = new Point(115, 248),
             Size = new Size(85, 32),
             BackColor = Color.FromArgb(0, 120, 215),
@@ -107,7 +107,7 @@ public partial class MainForm : Form
 
         _btnInfo = new Button
         {
-            Text = "Query Status",
+            Text = "查询状态",
             Location = new Point(210, 248),
             Size = new Size(95, 32),
             BackColor = Color.FromArgb(0, 150, 136),
@@ -119,7 +119,7 @@ public partial class MainForm : Form
 
         _btnLogout = new Button
         {
-            Text = "Logout",
+            Text = "登出",
             Location = new Point(315, 248),
             Size = new Size(85, 32),
             BackColor = Color.FromArgb(244, 67, 54),
@@ -129,12 +129,12 @@ public partial class MainForm : Form
         };
         _btnLogout.Click += BtnLogout_Click;
 
-        // Output
-        var lblOutput = new Label { Text = "Output:", Location = new Point(20, 295), Size = new Size(100, 20) };
+        // 输出
+        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 295), Size = new Size(100, 20) };
         _txtOutput = new TextBox
         {
             Location = new Point(20, 315),
-            Size = new Size(500, 120),
+            Size = new Size(500, 130),
             Multiline = true,
             ReadOnly = true,
             ScrollBars = ScrollBars.Vertical,
@@ -155,7 +155,7 @@ public partial class MainForm : Form
     {
         if (!ValidateInput()) return;
         SetButtonsEnabled(false);
-        AppendOutput("=== Login Attempt ===\n");
+        AppendOutput("=== 登录尝试 ===\n");
 
         try
         {
@@ -171,30 +171,30 @@ public partial class MainForm : Form
 
             var ipResult = portal.GetDetectedIp();
             var acIdResult = portal.GetDetectedAcId();
-            AppendOutput($"Detected - IP: {ipResult}, AC_ID: {acIdResult}\n");
+            AppendOutput($"检测结果 - IP: {ipResult}, AC_ID: {acIdResult}\n");
 
             _lastIp = ipResult;
             _lastAcId = acIdResult;
 
             var result = await portal.LoginAsync();
-            AppendOutput($"Result: {result.Error}\n");
+            AppendOutput($"结果: {result.Error}\n");
 
             if (result.IsSuccess)
             {
-                MessageBox.Show("Login successful!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("登录成功！", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 await QueryStatus(portal);
             }
             else
             {
-                var error = result.ErrorMsg ?? result.Message ?? result.Ecode ?? "Unknown error";
-                MessageBox.Show($"Login failed: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                AppendOutput($"Error: {error}\n");
+                var error = result.ErrorMsg ?? result.Message ?? result.Ecode ?? "未知错误";
+                MessageBox.Show($"登录失败：{error}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendOutput($"错误：{error}\n");
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            AppendOutput($"Exception: {ex.Message}\n");
+            MessageBox.Show($"错误：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendOutput($"异常：{ex.Message}\n");
         }
         finally
         {
@@ -206,7 +206,7 @@ public partial class MainForm : Form
     {
         if (!ValidateInput()) return;
         SetButtonsEnabled(false);
-        AppendOutput("=== Query Status ===\n");
+        AppendOutput("=== 查询状态 ===\n");
 
         try
         {
@@ -224,7 +224,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            AppendOutput($"Error: {ex.Message}\n");
+            AppendOutput($"错误：{ex.Message}\n");
         }
         finally
         {
@@ -236,7 +236,7 @@ public partial class MainForm : Form
     {
         if (!ValidateInput()) return;
         SetButtonsEnabled(false);
-        AppendOutput("=== Logout ===\n");
+        AppendOutput("=== 登出 ===\n");
 
         try
         {
@@ -254,19 +254,19 @@ public partial class MainForm : Form
 
             if (result.IsSuccess)
             {
-                MessageBox.Show("Logout successful!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                AppendOutput("Logout successful\n");
+                MessageBox.Show("登出成功！", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AppendOutput("登出成功\n");
             }
             else
             {
-                var error = result.ErrorMsg ?? result.Message ?? "Unknown error";
-                MessageBox.Show($"Logout failed: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                AppendOutput($"Error: {error}\n");
+                var error = result.ErrorMsg ?? result.Message ?? "未知错误";
+                MessageBox.Show($"登出失败：{error}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendOutput($"错误：{error}\n");
             }
         }
         catch (Exception ex)
         {
-            AppendOutput($"Error: {ex.Message}\n");
+            AppendOutput($"错误：{ex.Message}\n");
         }
         finally
         {
@@ -279,17 +279,17 @@ public partial class MainForm : Form
         try
         {
             var info = await portal.GetUserInfoAsync();
-            AppendOutput($"\n--- User Info ---\n");
-            AppendOutput($"Username: {info.UserName ?? "N/A"}\n");
-            AppendOutput($"IP: {info.OnlineIp ?? info.ClientIp ?? "N/A"}\n");
-            AppendOutput($"MAC: {info.UserMac ?? "N/A"}\n");
+            AppendOutput($"\n--- 用户信息 ---\n");
+            AppendOutput($"账号：{info.UserName ?? "N/A"}\n");
+            AppendOutput($"IP：{info.OnlineIp ?? info.ClientIp ?? "N/A"}\n");
+            AppendOutput($"MAC：{info.UserMac ?? "N/A"}\n");
 
             if (info.SumBytes > 0)
-                AppendOutput($"Traffic: {FormatFlow(info.SumBytes.Value)}\n");
+                AppendOutput($"已用流量：{FormatFlow(info.SumBytes.Value)}\n");
             if (info.SumSeconds > 0)
-                AppendOutput($"Duration: {FormatTime(info.SumSeconds.Value)}\n");
+                AppendOutput($"已用时长：{FormatTime(info.SumSeconds.Value)}\n");
             if (info.UserBalance.HasValue)
-                AppendOutput($"Balance: {info.UserBalance:F2}\n");
+                AppendOutput($"余额：{info.UserBalance:F2}\n");
         }
         catch { }
 
@@ -297,7 +297,7 @@ public partial class MainForm : Form
         {
             var expire = await portal.GetExpireTimeAsync();
             if (expire.HasValue)
-                AppendOutput($"Expire: {expire:yyyy-MM-dd HH:mm:ss}\n");
+                AppendOutput($"到期时间：{expire:yyyy-MM-dd HH:mm:ss}\n");
         }
         catch { }
 
@@ -308,12 +308,12 @@ public partial class MainForm : Form
     {
         if (string.IsNullOrWhiteSpace(_txtUrl.Text))
         {
-            MessageBox.Show("Please enter gateway URL", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("请输入网关地址", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
         if (string.IsNullOrWhiteSpace(_txtUsername.Text))
         {
-            MessageBox.Show("Please enter username", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
         return true;
@@ -347,10 +347,10 @@ public partial class MainForm : Form
         var m = (seconds % 3600) / 60;
         var s = seconds % 60;
         var parts = new List<string>();
-        if (d > 0) parts.Add($"{d}d");
-        if (h > 0) parts.Add($"{h}h");
-        if (m > 0) parts.Add($"{m}m");
-        if (s > 0 || parts.Count == 0) parts.Add($"{s}s");
+        if (d > 0) parts.Add($"{d}天");
+        if (h > 0) parts.Add($"{h}小时");
+        if (m > 0) parts.Add($"{m}分");
+        if (s > 0 || parts.Count == 0) parts.Add($"{s}秒");
         return string.Join("", parts);
     }
 }
