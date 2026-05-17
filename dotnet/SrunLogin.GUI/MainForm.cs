@@ -231,7 +231,7 @@ public partial class MainForm : Form
         {
             Location = new Point(10, advY + 22),
             Size = new Size(80, 24),
-            Text = "60",
+            Text = "10",
             Font = new Font("Segoe UI", 9F),
             BackColor = Color.White
         };
@@ -252,7 +252,7 @@ public partial class MainForm : Form
         {
             Location = new Point(10, advY + 22),
             Size = new Size(80, 24),
-            Text = "5",
+            Text = "3",
             Font = new Font("Segoe UI", 9F),
             BackColor = Color.White
         };
@@ -659,8 +659,8 @@ public partial class MainForm : Form
     private class LoopConfig
     {
         public bool Enable { get; set; }
-        public int Interval { get; set; } = 60;
-        public int Timeout { get; set; } = 5;
+        public int Interval { get; set; } = 10;
+        public int Timeout { get; set; } = 3;
         public string PingHost { get; set; } = "www.baidu.com";
     }
 
@@ -1047,7 +1047,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
     {
         try
         {
-            int timeout = 5;
+            int timeout = 3;
             int.TryParse(_txtLoopTimeout!.Text, out timeout);
             string host = string.IsNullOrWhiteSpace(_txtPingHost!.Text) ? "www.baidu.com" : _txtPingHost.Text;
 
