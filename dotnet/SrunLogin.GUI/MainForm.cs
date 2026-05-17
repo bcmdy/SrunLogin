@@ -119,6 +119,17 @@ public partial class MainForm : Form
                 DeleteConfig();
         };
 
+        // 填写说明按钮
+        var btnHelp = new Button
+        {
+            Text = "?",
+            Location = new Point(470, 58),
+            Size = new Size(25, 22),
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        btnHelp.Click += (s, e) => ShowHelp();
+
         // 按钮
         _btnLogin = new Button
         {
@@ -263,6 +274,61 @@ public partial class MainForm : Form
         public string? Domain { get; set; }
         public bool AutoDetectIp { get; set; } = true;
         public string? AcId { get; set; }
+    }
+
+    private void ShowHelp()
+    {
+        var helpText = @"填写说明
+==============
+
+网关地址
+  校园网认证服务器的 URL
+  通常是 http://10.0.0.1 或 http://192.168.0.1
+  可在浏览器打开任意网页自动跳转获取
+
+用户名
+  校园网账号，通常是学号或工号
+
+密码
+  校园网密码
+
+IP地址
+  本机在校园网中的 IP 地址
+  一般会自动检测，也可手动指定
+
+AC ID
+  认证设备编号，一般自动检测
+  如果登录失败可尝试手动指定
+
+域
+  部分校园网支持多域认证
+  示例：
+    留空    - 普通账号
+    @edu.cn  - 教育网用户
+    @student - 学生账号
+    @teacher - 教师账号
+
+保存配置
+  勾选后会将配置保存到本地
+  下次打开自动填入
+
+常见问题
+  -----------
+  1. 无法获取 IP
+     → 手动填写 IP 地址
+
+  2. ac_id 错误
+     → 尝试手动指定 AC ID
+
+  3. 当前已在线
+     → 账号已登录成功，无需重复登录
+
+  4. 认证信息加密错误
+     → AC ID 不正确，尝试更换
+
+  5. 在线设备数量超限
+     → 先登出其他设备";
+        MessageBox.Show(helpText, "填写说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private static TextBox CreatePlaceholderTextBox(int x, int y, int width, int height, string placeholder)
