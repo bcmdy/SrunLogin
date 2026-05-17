@@ -45,11 +45,20 @@ public partial class MainForm : Form
     private Button _btnInfo = null!;
     private RichTextBox _txtOutput = null!;
     private CheckBox _chkSaveConfig = null!;
-
     private CheckBox _chkShowPassword = null!;
 
     private string? _lastAcId;
     private string? _lastIp;
+
+    // 现代配色
+    private static readonly Color ColorBg = Color.FromArgb(248, 249, 250);
+    private static readonly Color ColorPrimary = Color.FromArgb(0, 120, 215);
+    private static readonly Color ColorInfo = Color.FromArgb(0, 150, 136);
+    private static readonly Color ColorDanger = Color.FromArgb(244, 67, 54);
+    private static readonly Color ColorWarning = Color.FromArgb(255, 193, 7);
+    private static readonly Color ColorText = Color.FromArgb(33, 37, 41);
+    private static readonly Color ColorLabel = Color.FromArgb(108, 117, 125);
+    private static readonly Color ColorBorder = Color.FromArgb(206, 212, 218);
 
     private string ConfigPath
     {
@@ -62,9 +71,7 @@ public partial class MainForm : Form
 
     public MainForm()
     {
-        // 禁用DPI缩放
         this.AutoScaleMode = AutoScaleMode.None;
-
         InitializeComponent();
         LoadConfig();
     }
@@ -78,139 +85,159 @@ public partial class MainForm : Form
     private void InitializeComponent()
     {
         Text = "校园网认证工具";
-        Size = new Size(580, 610);
+        Size = new Size(640, 680);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
-        BackColor = Color.FromArgb(240, 240, 240);
+        BackColor = ColorBg;
+        Font = new Font("Segoe UI", 9F);
 
+        int marginX = 35;
+        int startY = 20;
+
+        // 标题
         var lblTitle = new Label
         {
             Text = "校园网登录",
-            Font = new Font("Microsoft YaHei", 14, FontStyle.Bold),
-            Location = new Point(20, 15),
-            Size = new Size(200, 30)
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            Location = new Point(marginX, startY),
+            Size = new Size(250, 32),
+            ForeColor = ColorText
         };
 
+        // 分隔线
+        var line = new Panel
+        {
+            Location = new Point(marginX, startY + 36),
+            Size = new Size(560, 1),
+            BackColor = ColorBorder
+        };
+
+        // 表单区域
+        int y = startY + 55;
+        int lblW = 85;
+        int inputX = marginX + lblW + 12;
+        int inputW = 565 - lblW - marginX * 2;
+
         // 网关地址
-        var lblUrl = new Label { Text = "网关地址:", Location = new Point(20, 60), Size = new Size(90, 20) };
-        _txtUrl = CreatePlaceholderTextBox(115, 58, 420, 22, "http://10.0.0.1");
+        var lblUrl = CreateLabel("网关地址", marginX, y);
+        _txtUrl = CreateModernTextBox(inputX, y, inputW, "http://10.0.0.1");
+        y += 46;
 
         // 用户名
-        var lblUser = new Label { Text = "用户名:", Location = new Point(20, 90), Size = new Size(90, 20) };
-        _txtUsername = CreatePlaceholderTextBox(115, 88, 420, 22, "请输入用户名");
+        var lblUser = CreateLabel("用户名", marginX, y);
+        _txtUsername = CreateModernTextBox(inputX, y, inputW, "请输入用户名");
+        y += 46;
 
         // 密码
-        var lblPwd = new Label { Text = "密码:", Location = new Point(20, 120), Size = new Size(90, 20) };
-        _txtPassword = CreatePlaceholderTextBox(115, 118, 340, 22, "请输入密码");
+        var lblPwd = CreateLabel("密码", marginX, y);
+        _txtPassword = CreateModernTextBox(inputX, y, inputW - 80, "请输入密码");
         _txtPassword.UseSystemPasswordChar = true;
 
         _chkShowPassword = new CheckBox
         {
             Text = "显示",
-            Location = new Point(460, 118),
+            Location = new Point(inputX + inputW - 70, y + 2),
             Size = new Size(60, 20),
-            FlatStyle = FlatStyle.Flat
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 8.5F)
         };
         _chkShowPassword.CheckedChanged += (s, e) =>
         {
             _txtPassword.UseSystemPasswordChar = !_chkShowPassword.Checked;
         };
+        y += 46;
 
-        // IP地址
-        var lblIp = new Label { Text = "IP地址:", Location = new Point(20, 150), Size = new Size(90, 20) };
-        _txtIp = CreatePlaceholderTextBox(115, 148, 150, 22, "留空自动获取");
+        // IP & AC ID 同行
+        var lblIp = CreateLabel("IP 地址", marginX, y);
+        _txtIp = CreateModernTextBox(inputX, y, 170, "留空自动获取");
 
-        // AC_ID
-        var lblAcId = new Label { Text = "AC ID:", Location = new Point(280, 150), Size = new Size(55, 20) };
-        _txtAcId = CreatePlaceholderTextBox(340, 148, 195, 22, "留空自动获取");
+        var lblAcId = new Label
+        {
+            Text = "AC ID:",
+            Location = new Point(inputX + 190, y + 2),
+            Size = new Size(45, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _txtAcId = CreateModernTextBox(inputX + 240, y, inputW - 240, "留空自动获取");
+        y += 46;
 
         // 域
-        var lblDomain = new Label { Text = "域:", Location = new Point(20, 180), Size = new Size(90, 20) };
-        _txtDomain = CreatePlaceholderTextBox(115, 178, 300, 22, "@edu.cn");
+        var lblDomain = CreateLabel("域", marginX, y);
+        _txtDomain = CreateModernTextBox(inputX, y, 340, "@edu.cn");
 
-        // 保存配置
         _chkSaveConfig = new CheckBox
         {
             Text = "保存配置",
-            Location = new Point(415, 178),
-            Size = new Size(100, 20),
+            Location = new Point(inputX + 360, y + 2),
+            Size = new Size(90, 20),
             FlatStyle = FlatStyle.Flat,
-            Checked = true
+            Checked = true,
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
         };
         _chkSaveConfig.CheckedChanged += (s, e) =>
         {
-            if (_chkSaveConfig.Checked)
-                SaveConfig();
-            else
-                DeleteConfig();
+            if (_chkSaveConfig.Checked) SaveConfig(); else DeleteConfig();
         };
+        y += 58;
 
-        // 按钮（平铺到窗口，相同宽度）
-        const int btnWidth = 120;
-        const int btnSpacing = 10;
-        const int btnStartX = 35;
-        _btnLogin = new Button
-        {
-            Text = "登录",
-            Location = new Point(btnStartX, 220),
-            Size = new Size(btnWidth, 32),
-            BackColor = Color.FromArgb(0, 120, 215),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
+        // 按钮区域 - 等宽均匀分布
+        const int btnWidth = 125;
+        const int btnHeight = 34;
+        const int btnSpacing = 12;
+        int totalWidth = btnWidth * 4 + btnSpacing * 3;
+        int btnStartX = (ClientSize.Width - totalWidth) / 2;
+
+        _btnLogin = CreateFlatButton("登录", btnStartX, y, btnWidth, btnHeight, ColorPrimary);
         _btnLogin.Click += BtnLogin_Click;
 
-        _btnInfo = new Button
-        {
-            Text = "查询状态",
-            Location = new Point(btnStartX + btnWidth + btnSpacing, 220),
-            Size = new Size(btnWidth, 32),
-            BackColor = Color.FromArgb(0, 150, 136),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
+        _btnInfo = CreateFlatButton("查询状态", btnStartX + btnWidth + btnSpacing, y, btnWidth, btnHeight, ColorInfo);
         _btnInfo.Click += BtnInfo_Click;
 
-        _btnLogout = new Button
-        {
-            Text = "登出",
-            Location = new Point(btnStartX + (btnWidth + btnSpacing) * 2, 220),
-            Size = new Size(btnWidth, 32),
-            BackColor = Color.FromArgb(244, 67, 54),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
+        _btnLogout = CreateFlatButton("登出", btnStartX + (btnWidth + btnSpacing) * 2, y, btnWidth, btnHeight, ColorDanger);
         _btnLogout.Click += BtnLogout_Click;
 
-        var btnHelp = new Button
-        {
-            Text = "填写帮助",
-            Location = new Point(btnStartX + (btnWidth + btnSpacing) * 3, 220),
-            Size = new Size(btnWidth, 32),
-            BackColor = Color.Yellow,
-            ForeColor = Color.Black,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
+        var btnHelp = CreateFlatButton("填写帮助", btnStartX + (btnWidth + btnSpacing) * 3, y, btnWidth, btnHeight, ColorWarning);
+        btnHelp.ForeColor = ColorText;
         btnHelp.Click += (s, e) => ShowHelp();
+        y += 55;
 
-        // 输出
-        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 260), Size = new Size(100, 20) };
+        // 输出区域
+        var lblOutput = new Label
+        {
+            Text = "输出日志",
+            Location = new Point(marginX, y),
+            Size = new Size(100, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+        };
+
         _txtOutput = new RichTextBox
         {
-            Location = new Point(20, 280),
-            Size = new Size(520, 290),
+            Location = new Point(1, 1),
+            Size = new Size(558, 248),
             Multiline = true,
             ReadOnly = true,
-            ScrollBars = RichTextBoxScrollBars.Both,
+            ScrollBars = RichTextBoxScrollBars.Vertical,
             BackColor = Color.White,
-            Font = new Font("Consolas", 9),
+            ForeColor = ColorText,
+            Font = new Font("Consolas", 9.5F),
+            BorderStyle = BorderStyle.None,
             AcceptsTab = true
         };
+
+        var outputPanel = new Panel
+        {
+            Location = new Point(marginX, y + 22),
+            Size = new Size(560, 250),
+            BackColor = ColorBorder,
+            Padding = new Padding(1)
+        };
+        outputPanel.Controls.Add(_txtOutput);
+
         // 强制显示垂直滚动条
         var si = new SCROLLINFO { cbSize = Marshal.SizeOf<SCROLLINFO>(), fMask = SIF_DISABLENOSCROLL, nMin = 0, nMax = 100, nPage = 100 };
         SetScrollInfo(_txtOutput.Handle, SB_VERT, ref si, true);
@@ -218,11 +245,93 @@ public partial class MainForm : Form
 
         Controls.AddRange(new Control[]
         {
-            lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword, _chkShowPassword, lblIp, _txtIp, lblAcId, _txtAcId,
-            lblDomain, _txtDomain, _chkSaveConfig,
-            _btnLogin, _btnInfo, _btnLogout, btnHelp, lblOutput, _txtOutput
+            lblTitle, line,
+            lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword, _chkShowPassword,
+            lblIp, _txtIp, lblAcId, _txtAcId, lblDomain, _txtDomain, _chkSaveConfig,
+            _btnLogin, _btnInfo, _btnLogout, btnHelp,
+            lblOutput, outputPanel
         });
+    }
 
+    private Label CreateLabel(string text, int x, int y)
+    {
+        return new Label
+        {
+            Text = text,
+            Location = new Point(x, y + 2),
+            Size = new Size(85, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F),
+            TextAlign = ContentAlignment.MiddleRight
+        };
+    }
+
+    private TextBox CreateModernTextBox(int x, int y, int width, string placeholder)
+    {
+        var txt = new TextBox
+        {
+            Location = new Point(x, y),
+            Size = new Size(width, 26),
+            Tag = placeholder,
+            BorderStyle = BorderStyle.None,
+            Font = new Font("Segoe UI", 9.5F),
+            BackColor = ColorBg,
+            ForeColor = Color.Gray
+        };
+
+        txt.Text = placeholder;
+
+        // 底部线条
+        var underline = new Panel
+        {
+            Location = new Point(x, y + 24),
+            Size = new Size(width, 1),
+            BackColor = ColorBorder
+        };
+        Controls.Add(underline);
+
+        txt.GotFocus += (s, e) =>
+        {
+            if (txt.Text == placeholder)
+            {
+                txt.Text = "";
+                txt.ForeColor = ColorText;
+                if (placeholder == "请输入密码")
+                    txt.UseSystemPasswordChar = true;
+            }
+            underline.BackColor = ColorPrimary;
+            underline.Height = 2;
+        };
+
+        txt.LostFocus += (s, e) =>
+        {
+            if (string.IsNullOrWhiteSpace(txt.Text))
+            {
+                txt.Text = placeholder;
+                txt.ForeColor = Color.Gray;
+                if (placeholder == "请输入密码")
+                    txt.UseSystemPasswordChar = true;
+            }
+            underline.BackColor = ColorBorder;
+            underline.Height = 1;
+        };
+
+        return txt;
+    }
+
+    private Button CreateFlatButton(string text, int x, int y, int w, int h, Color backColor)
+    {
+        return new Button
+        {
+            Text = text,
+            Location = new Point(x, y),
+            Size = new Size(w, h),
+            BackColor = backColor,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+        };
     }
 
     private void LoadConfig()
@@ -238,18 +347,14 @@ public partial class MainForm : Form
                     SetTextBoxIfPlaceholder(_txtUrl, config.Url ?? "http://10.0.0.1");
                     SetTextBoxIfPlaceholder(_txtUsername, config.Username ?? "");
                     if (!string.IsNullOrEmpty(config.Password))
-                    {
                         SetTextBoxIfPlaceholder(_txtPassword, config.Password);
-                    }
                     SetTextBoxIfPlaceholder(_txtDomain, config.Domain ?? "@edu.cn");
                     if (!string.IsNullOrEmpty(config.Ip) && config.Ip != _txtIp.Tag?.ToString())
                     {
                         SetTextBoxIfPlaceholder(_txtIp, config.Ip);
                     }
                     if (!string.IsNullOrEmpty(config.AcId) && config.AcId != _txtAcId.Tag?.ToString())
-                    {
                         SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
-                    }
                     _chkSaveConfig.Checked = true;
                 }
             }
@@ -262,7 +367,7 @@ public partial class MainForm : Form
         if (txt.Text == txt.Tag?.ToString() || string.IsNullOrWhiteSpace(txt.Text))
         {
             txt.Text = value;
-            txt.ForeColor = Color.Black;
+            txt.ForeColor = ColorText;
         }
     }
 
@@ -341,41 +446,18 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         _txtOutput.Text = helpText;
     }
 
-    private static TextBox CreatePlaceholderTextBox(int x, int y, int width, int height, string placeholder)
+    private static string GetActualText(TextBox txt, string defaultValue = "")
     {
-        var txt = new TextBox
-        {
-            Location = new Point(x, y),
-            Size = new Size(width, height),
-            Tag = placeholder
-        };
+        var placeholder = txt.Tag?.ToString() ?? "";
+        if (txt.Text == placeholder)
+            return defaultValue;
+        return txt.Text.Trim();
+    }
 
-        txt.Text = placeholder;
-        txt.ForeColor = Color.Gray;
-
-        txt.GotFocus += (s, e) =>
-        {
-            if (txt.Text == placeholder)
-            {
-                txt.Text = "";
-                txt.ForeColor = Color.Black;
-                if (txt.Tag?.ToString() == "请输入密码")
-                    txt.UseSystemPasswordChar = true;
-            }
-        };
-
-        txt.LostFocus += (s, e) =>
-        {
-            if (string.IsNullOrWhiteSpace(txt.Text))
-            {
-                txt.Text = placeholder;
-                txt.ForeColor = Color.Gray;
-                if (txt.Tag?.ToString() == "请输入密码")
-                    txt.UseSystemPasswordChar = true;
-            }
-        };
-
-        return txt;
+    private static bool IsPlaceholder(TextBox txt)
+    {
+        var placeholder = txt.Tag?.ToString() ?? "";
+        return string.IsNullOrWhiteSpace(txt.Text) || txt.Text == placeholder;
     }
 
     private async void BtnLogin_Click(object? sender, EventArgs e)
@@ -403,7 +485,6 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             return;
         }
 
-        // 保存配置
         if (_chkSaveConfig.Checked)
             SaveConfig();
 
@@ -526,26 +607,12 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         }
     }
 
-    private static string GetActualText(TextBox txt, string defaultValue = "")
-    {
-        var placeholder = txt.Tag?.ToString() ?? "";
-        if (txt.Text == placeholder)
-            return defaultValue;
-        return txt.Text.Trim();
-    }
-
-    private static bool IsPlaceholder(TextBox txt)
-    {
-        var placeholder = txt.Tag?.ToString() ?? "";
-        return string.IsNullOrWhiteSpace(txt.Text) || txt.Text == placeholder;
-    }
-
     private async Task QueryStatus(SrunPortal portal)
     {
         try
         {
             var info = await portal.GetUserInfoAsync();
-            AppendOutput($"\n--- 用户信息 ---\n");
+            AppendOutput("\n--- 用户信息 ---\n");
             AppendOutput($"账号：{info.UserName ?? "N/A"}\n");
             AppendOutput($"IP：{info.OnlineIp ?? info.ClientIp ?? "N/A"}\n");
             AppendOutput($"MAC：{info.UserMac ?? "N/A"}\n");
