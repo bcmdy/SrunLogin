@@ -57,6 +57,10 @@ public partial class MainForm : Form
     private static readonly Color ColorLabel = Color.FromArgb(108, 117, 125);
     private static readonly Color ColorBorder = Color.FromArgb(206, 212, 218);
 
+    private Panel? _advancedPanel;
+    private bool _isAdvancedExpanded = false;
+    private const int ExpandedWidth = 200;
+
     private string ConfigPath
     {
         get
@@ -123,6 +127,44 @@ public partial class MainForm : Form
             Size = new Size(250, 32),
             ForeColor = ColorText
         };
+
+        // 高级功能按钮（竖着的侧边栏按钮，位于窗口右侧）
+        var btnAdvanced = new Label
+        {
+            Text = "高\n级\n功\n能\n▶",
+            Location = new Point(590, 200),
+            Size = new Size(35, 180),
+            BackColor = ColorPrimary,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand
+        };
+        btnAdvanced.Click += (s, e) =>
+        {
+            _isAdvancedExpanded = !_isAdvancedExpanded;
+            Size = new Size(_isAdvancedExpanded ? 840 : 640, Height);
+            btnAdvanced.Text = _isAdvancedExpanded ? "高\n级\n功\n能\n◀" : "高\n级\n功\n能\n▶";
+        };
+
+        // 高级功能面板（右侧折叠区域）
+        _advancedPanel = new Panel
+        {
+            Location = new Point(640, 0),
+            Size = new Size(ExpandedWidth, 680),
+            BackColor = Color.FromArgb(230, 235, 240),
+            Visible = false
+        };
+
+        var lblAdvancedTitle = new Label
+        {
+            Text = "高级功能",
+            Location = new Point(10, 15),
+            Size = new Size(180, 25),
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = ColorText
+        };
+        _advancedPanel.Controls.Add(lblAdvancedTitle);
 
         // 分隔线
         var line = new Panel
@@ -277,11 +319,12 @@ public partial class MainForm : Form
 
         Controls.AddRange(new Control[]
         {
-            lblTitle, line,
+            lblTitle, line, btnAdvanced,
             lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword, _chkShowPassword,
             lblIp, _txtIp, lblAcId, _txtAcId, lblDomain, _txtDomain, _chkSaveConfig, _chkAutoLogin,
             _btnLogin, _btnInfo, _btnLogout, btnHelp,
-            lblOutput, outputPanel
+            lblOutput, outputPanel,
+            _advancedPanel
         });
     }
 
