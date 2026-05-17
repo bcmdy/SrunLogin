@@ -18,18 +18,20 @@ public partial class MainForm : Form
     private Button _btnLogout = null!;
     private Button _btnInfo = null!;
     private TextBox _txtOutput = null!;
-    private CheckBox _chkShowPassword = null!;
-    private CheckBox _chkAutoDetect = null!;
     private CheckBox _chkSaveConfig = null!;
+    private CheckBox _chkShowPassword = null!;
 
     private string? _lastAcId;
     private string? _lastIp;
 
-    private readonly string _configPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "SrunLogin",
-        "config.json"
-    );
+    private string ConfigPath
+    {
+        get
+        {
+            var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(exeDir, "config.json");
+        }
+    }
 
     public MainForm()
     {
@@ -81,23 +83,11 @@ public partial class MainForm : Form
 
         // IP地址
         var lblIp = new Label { Text = "IP地址:", Location = new Point(20, 150), Size = new Size(90, 20) };
-        _txtIp = CreatePlaceholderTextBox(115, 148, 150, 22, "自动检测");
-
-        _chkAutoDetect = new CheckBox
-        {
-            Text = "自动检测",
-            Location = new Point(270, 148),
-            Size = new Size(90, 20),
-            Checked = true,
-            FlatStyle = FlatStyle.Flat
-        };
-        _chkAutoDetect.CheckedChanged += (s, e) => _txtIp.Enabled = !_chkAutoDetect.Checked;
+        _txtIp = CreatePlaceholderTextBox(115, 148, 150, 22, "");
 
         // AC_ID
-        var lblAcId = new Label { Text = "AC ID:", Location = new Point(20, 180), Size = new Size(90, 20) };
-        _txtAcId = CreatePlaceholderTextBox(115, 178, 100, 22, "留空自动检测");
-
-        var lblAcIdNote = new Label { Text = "(留空自动检测)", Location = new Point(220, 180), Size = new Size(100, 20), ForeColor = Color.Gray };
+        var lblAcId = new Label { Text = "AC ID:", Location = new Point(270, 150), Size = new Size(60, 20) };
+        _txtAcId = CreatePlaceholderTextBox(335, 148, 130, 22, "");
 
         // 域
         var lblDomain = new Label { Text = "域:", Location = new Point(20, 210), Size = new Size(90, 20) };
@@ -183,8 +173,8 @@ public partial class MainForm : Form
         Controls.AddRange(new Control[]
         {
             lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword,
-            _chkShowPassword, lblIp, _txtIp, _chkAutoDetect, lblAcId, _txtAcId,
-            lblAcIdNote, lblDomain, _txtDomain, _chkSaveConfig,
+            _chkShowPassword, lblIp, _txtIp, lblAcId, _txtAcId,
+            lblDomain, _txtDomain, _chkSaveConfig,
             _btnLogin, _btnInfo, _btnLogout, lblOutput, _txtOutput
         });
 
@@ -196,9 +186,9 @@ public partial class MainForm : Form
     {
         try
         {
-            if (File.Exists(_configPath))
+            if (File.Exists(ConfigPath))
             {
-                var json = File.ReadAllText(_configPath);
+                var json = File.ReadAllText(ConfigPath);
                 var config = JsonSerializer.Deserialize<Config>(json);
                 if (config != null)
                 {
@@ -209,7 +199,6 @@ public partial class MainForm : Form
                         SetTextBoxIfPlaceholder(_txtPassword, config.Password);
                     }
                     SetTextBoxIfPlaceholder(_txtDomain, config.Domain ?? "@edu.cn");
-                    _chkAutoDetect.Checked = config.AutoDetectIp;
                     if (!string.IsNullOrEmpty(config.AcId))
                     {
                         SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
@@ -234,7 +223,7 @@ public partial class MainForm : Form
     {
         try
         {
-            var dir = Path.GetDirectoryName(_configPath);
+            var dir = Path.GetDirectoryName(ConfigPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
@@ -244,12 +233,11 @@ public partial class MainForm : Form
                 Username = GetActualText(_txtUsername),
                 Password = GetActualText(_txtPassword, ""),
                 Domain = GetActualText(_txtDomain, ""),
-                AutoDetectIp = _chkAutoDetect.Checked,
-                AcId = _txtAcId.Text == "留空自动检测" ? "" : _txtAcId.Text
+                AcId = _txtAcId.Text
             };
 
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_configPath, json);
+            File.WriteAllText(ConfigPath, json);
             AppendOutput("[配置] 已保存\n");
         }
         catch (Exception ex)
@@ -262,8 +250,8 @@ public partial class MainForm : Form
     {
         try
         {
-            if (File.Exists(_configPath))
-                File.Delete(_configPath);
+            if (File.Exists(ConfigPath))
+                File.Delete(ConfigPath);
             AppendOutput("[配置] 已删除\n");
         }
         catch { }
@@ -275,7 +263,6 @@ public partial class MainForm : Form
         public string? Username { get; set; }
         public string? Password { get; set; }
         public string? Domain { get; set; }
-        public bool AutoDetectIp { get; set; } = true;
         public string? AcId { get; set; }
     }
 
@@ -297,11 +284,11 @@ public partial class MainForm : Form
 
 IP地址
   本机在校园网中的 IP 地址
-  一般会自动检测，也可手动指定
+  留空则自动检测，也可手动指定
 
 AC ID
-  认证设备编号，一般自动检测
-  如果登录失败可尝试手动指定
+  认证设备编号
+  留空则自动检测，如果登录失败可尝试手动指定
 
 域
   部分校园网支持多域认证
@@ -376,8 +363,8 @@ AC ID
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
         var username = GetActualText(_txtUsername);
         var password = GetActualText(_txtPassword, "");
-        var ip = _chkAutoDetect.Checked ? null : GetActualText(_txtIp, "");
-        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) || _txtAcId.Text == "留空自动检测" ? null : _txtAcId.Text.Trim();
+        var ip = string.IsNullOrWhiteSpace(_txtIp.Text) ? null : _txtIp.Text.Trim();
+        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
         var domain = GetActualText(_txtDomain, "");
 
         if (string.IsNullOrWhiteSpace(url))
@@ -451,8 +438,8 @@ AC ID
         }
 
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
-        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) || _txtAcId.Text == "留空自动检测" ? null : _txtAcId.Text.Trim();
-        var ip = _chkAutoDetect.Checked ? null : GetActualText(_txtIp, "");
+        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
+        var ip = string.IsNullOrWhiteSpace(_txtIp.Text) ? null : _txtIp.Text.Trim();
         var domain = GetActualText(_txtDomain, "");
 
         SetButtonsEnabled(false);
@@ -484,8 +471,8 @@ AC ID
         }
 
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
-        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) || _txtAcId.Text == "留空自动检测" ? null : _txtAcId.Text.Trim();
-        var ip = _chkAutoDetect.Checked ? (_lastIp ?? GetActualText(_txtIp, "")) : GetActualText(_txtIp, "");
+        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
+        var ip = string.IsNullOrWhiteSpace(_txtIp.Text) ? (_lastIp ?? "") : _txtIp.Text.Trim();
         var domain = GetActualText(_txtDomain, "");
 
         SetButtonsEnabled(false);
