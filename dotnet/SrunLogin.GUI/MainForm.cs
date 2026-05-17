@@ -48,15 +48,16 @@ public partial class MainForm : Form
 
         // 网关地址
         var lblUrl = new Label { Text = "网关地址:", Location = new Point(20, 60), Size = new Size(90, 20) };
-        _txtUrl = new TextBox { Location = new Point(115, 58), Size = new Size(350, 22), Text = "http://10.0.0.1" };
+        _txtUrl = CreatePlaceholderTextBox(115, 58, 350, 22, "http://10.0.0.1");
 
         // 用户名
         var lblUser = new Label { Text = "用户名:", Location = new Point(20, 90), Size = new Size(90, 20) };
-        _txtUsername = new TextBox { Location = new Point(115, 88), Size = new Size(200, 22) };
+        _txtUsername = CreatePlaceholderTextBox(115, 88, 200, 22, "请输入用户名");
 
         // 密码
         var lblPwd = new Label { Text = "密码:", Location = new Point(20, 120), Size = new Size(90, 20) };
-        _txtPassword = new TextBox { Location = new Point(115, 118), Size = new Size(200, 22), UseSystemPasswordChar = true };
+        _txtPassword = CreatePlaceholderTextBox(115, 118, 200, 22, "请输入密码");
+        _txtPassword.UseSystemPasswordChar = true;
 
         _chkShowPassword = new CheckBox
         {
@@ -66,11 +67,13 @@ public partial class MainForm : Form
             FlatStyle = FlatStyle.Flat
         };
         _chkShowPassword.CheckedChanged += (s, e) =>
+        {
             _txtPassword.UseSystemPasswordChar = !_chkShowPassword.Checked;
+        };
 
         // IP地址
         var lblIp = new Label { Text = "IP地址:", Location = new Point(20, 150), Size = new Size(90, 20) };
-        _txtIp = new TextBox { Location = new Point(115, 148), Size = new Size(150, 22), Enabled = false };
+        _txtIp = CreatePlaceholderTextBox(115, 148, 150, 22, "自动检测");
 
         _chkAutoDetect = new CheckBox
         {
@@ -84,13 +87,13 @@ public partial class MainForm : Form
 
         // AC_ID
         var lblAcId = new Label { Text = "AC ID:", Location = new Point(20, 180), Size = new Size(90, 20) };
-        _txtAcId = new TextBox { Location = new Point(115, 178), Size = new Size(100, 22), Enabled = false };
+        _txtAcId = CreatePlaceholderTextBox(115, 178, 100, 22, "留空自动检测");
 
         var lblAcIdNote = new Label { Text = "(留空自动检测)", Location = new Point(220, 180), Size = new Size(100, 20), ForeColor = Color.Gray };
 
         // 域
         var lblDomain = new Label { Text = "域:", Location = new Point(20, 210), Size = new Size(90, 20) };
-        _txtDomain = new TextBox { Location = new Point(115, 208), Size = new Size(150, 22) };
+        _txtDomain = CreatePlaceholderTextBox(115, 208, 150, 22, "@edu.cn");
 
         // 按钮
         _btnLogin = new Button
@@ -151,21 +154,77 @@ public partial class MainForm : Form
         });
     }
 
+    private static TextBox CreatePlaceholderTextBox(int x, int y, int width, int height, string placeholder)
+    {
+        var txt = new TextBox
+        {
+            Location = new Point(x, y),
+            Size = new Size(width, height),
+            Tag = placeholder
+        };
+
+        var placeholderColor = Color.Gray;
+        var normalColor = Color.Black;
+
+        txt.Text = placeholder;
+        txt.ForeColor = placeholderColor;
+
+        txt.GotFocus += (s, e) =>
+        {
+            if (txt.Text == placeholder)
+            {
+                txt.Text = "";
+                txt.ForeColor = normalColor;
+                if (txt.Tag?.ToString() == "请输入密码")
+                    txt.UseSystemPasswordChar = true;
+            }
+        };
+
+        txt.LostFocus += (s, e) =>
+        {
+            if (string.IsNullOrWhiteSpace(txt.Text))
+            {
+                txt.Text = placeholder;
+                txt.ForeColor = placeholderColor;
+                if (txt.Tag?.ToString() == "请输入密码")
+                    txt.UseSystemPasswordChar = true;
+            }
+        };
+
+        return txt;
+    }
+
     private async void BtnLogin_Click(object? sender, EventArgs e)
     {
-        if (!ValidateInput()) return;
+        // 获取实际值（忽略占位符）
+        var url = GetActualText(_txtUrl, "http://10.0.0.1");
+        var username = GetActualText(_txtUsername);
+        var password = GetActualText(_txtPassword, "");
+        var ip = _chkAutoDetect.Checked ? null : GetActualText(_txtIp, "");
+        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) || _txtAcId.Text == "留空自动检测" ? null : _txtAcId.Text.Trim();
+        var domain = GetActualText(_txtDomain, "");
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            MessageBox.Show("请输入网关地址", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            MessageBox.Show("请输入密码", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         SetButtonsEnabled(false);
         AppendOutput("=== 登录尝试 ===\n");
 
         try
         {
-            var url = _txtUrl.Text.Trim();
-            var username = _txtUsername.Text.Trim();
-            var password = _txtPassword.Text;
-            var ip = _chkAutoDetect.Checked ? null : _txtIp.Text.Trim();
-            var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
-            var domain = _txtDomain.Text.Trim();
-
             var portal = new SrunPortal(url, username, password, acId, ip, domain);
             await portal.DetectInfoAsync();
 
@@ -204,21 +263,24 @@ public partial class MainForm : Form
 
     private async void BtnInfo_Click(object? sender, EventArgs e)
     {
-        if (!ValidateInput()) return;
+        var username = GetActualText(_txtUsername);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var url = GetActualText(_txtUrl, "http://10.0.0.1");
+        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) || _txtAcId.Text == "留空自动检测" ? null : _txtAcId.Text.Trim();
+        var ip = _chkAutoDetect.Checked ? null : GetActualText(_txtIp, "");
+        var domain = GetActualText(_txtDomain, "");
+
         SetButtonsEnabled(false);
         AppendOutput("=== 查询状态 ===\n");
 
         try
         {
-            var portal = new SrunPortal(
-                _txtUrl.Text.Trim(),
-                _txtUsername.Text.Trim(),
-                "",
-                string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim(),
-                _chkAutoDetect.Checked ? null : _txtIp.Text.Trim(),
-                _txtDomain.Text.Trim()
-            );
-
+            var portal = new SrunPortal(url, username, "", acId, ip, domain);
             await portal.DetectInfoAsync();
             await QueryStatus(portal);
         }
@@ -234,21 +296,24 @@ public partial class MainForm : Form
 
     private async void BtnLogout_Click(object? sender, EventArgs e)
     {
-        if (!ValidateInput()) return;
+        var username = GetActualText(_txtUsername);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var url = GetActualText(_txtUrl, "http://10.0.0.1");
+        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) || _txtAcId.Text == "留空自动检测" ? null : _txtAcId.Text.Trim();
+        var ip = _chkAutoDetect.Checked ? (_lastIp ?? GetActualText(_txtIp, "")) : GetActualText(_txtIp, "");
+        var domain = GetActualText(_txtDomain, "");
+
         SetButtonsEnabled(false);
         AppendOutput("=== 登出 ===\n");
 
         try
         {
-            var portal = new SrunPortal(
-                _txtUrl.Text.Trim(),
-                _txtUsername.Text.Trim(),
-                "",
-                string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim(),
-                _chkAutoDetect.Checked ? (_lastIp ?? _txtIp.Text.Trim()) : _txtIp.Text.Trim(),
-                _txtDomain.Text.Trim()
-            );
-
+            var portal = new SrunPortal(url, username, "", acId, ip, domain);
             await portal.DetectInfoAsync();
             var result = await portal.LogoutAsync();
 
@@ -272,6 +337,14 @@ public partial class MainForm : Form
         {
             SetButtonsEnabled(true);
         }
+    }
+
+    private static string GetActualText(TextBox txt, string defaultValue = "")
+    {
+        var placeholder = txt.Tag?.ToString() ?? "";
+        if (txt.Text == placeholder)
+            return defaultValue;
+        return txt.Text.Trim();
     }
 
     private async Task QueryStatus(SrunPortal portal)
@@ -302,21 +375,6 @@ public partial class MainForm : Form
         catch { }
 
         AppendOutput("\n");
-    }
-
-    private bool ValidateInput()
-    {
-        if (string.IsNullOrWhiteSpace(_txtUrl.Text))
-        {
-            MessageBox.Show("请输入网关地址", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return false;
-        }
-        if (string.IsNullOrWhiteSpace(_txtUsername.Text))
-        {
-            MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return false;
-        }
-        return true;
     }
 
     private void SetButtonsEnabled(bool enabled)
