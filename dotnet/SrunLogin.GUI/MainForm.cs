@@ -210,7 +210,7 @@ public partial class MainForm : Form
                         SetTextBoxIfPlaceholder(_txtPassword, config.Password);
                     }
                     SetTextBoxIfPlaceholder(_txtDomain, config.Domain ?? "@edu.cn");
-                    if (!string.IsNullOrEmpty(config.AcId))
+                    if (!string.IsNullOrEmpty(config.AcId) && config.AcId != _txtAcId.Tag?.ToString())
                     {
                         SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
                     }
@@ -244,7 +244,7 @@ public partial class MainForm : Form
                 Username = GetActualText(_txtUsername),
                 Password = GetActualText(_txtPassword, ""),
                 Domain = GetActualText(_txtDomain, ""),
-                AcId = _txtAcId.Text
+                AcId = IsPlaceholder(_txtAcId) ? "" : _txtAcId.Text.Trim()
             };
 
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
