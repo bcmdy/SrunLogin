@@ -20,19 +20,27 @@ public partial class MainForm : Form
     private TextBox _txtOutput = null!;
     private CheckBox _chkShowPassword = null!;
     private CheckBox _chkAutoDetect = null!;
+    private CheckBox _chkSaveConfig = null!;
 
     private string? _lastAcId;
     private string? _lastIp;
 
+    private readonly string _configPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SrunLogin",
+        "config.json"
+    );
+
     public MainForm()
     {
         InitializeComponent();
+        LoadConfig();
     }
 
     private void InitializeComponent()
     {
         Text = "校园网认证工具";
-        Size = new Size(550, 520);
+        Size = new Size(550, 550);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -95,11 +103,27 @@ public partial class MainForm : Form
         var lblDomain = new Label { Text = "域:", Location = new Point(20, 210), Size = new Size(90, 20) };
         _txtDomain = CreatePlaceholderTextBox(115, 208, 150, 22, "@edu.cn");
 
+        // 保存配置
+        _chkSaveConfig = new CheckBox
+        {
+            Text = "保存配置",
+            Location = new Point(20, 248),
+            Size = new Size(90, 20),
+            FlatStyle = FlatStyle.Flat
+        };
+        _chkSaveConfig.CheckedChanged += (s, e) =>
+        {
+            if (_chkSaveConfig.Checked)
+                SaveConfig();
+            else
+                DeleteConfig();
+        };
+
         // 按钮
         _btnLogin = new Button
         {
             Text = "登录",
-            Location = new Point(115, 248),
+            Location = new Point(115, 240),
             Size = new Size(85, 32),
             BackColor = Color.FromArgb(0, 120, 215),
             ForeColor = Color.White,
@@ -111,7 +135,7 @@ public partial class MainForm : Form
         _btnInfo = new Button
         {
             Text = "查询状态",
-            Location = new Point(210, 248),
+            Location = new Point(210, 240),
             Size = new Size(95, 32),
             BackColor = Color.FromArgb(0, 150, 136),
             ForeColor = Color.White,
@@ -123,7 +147,7 @@ public partial class MainForm : Form
         _btnLogout = new Button
         {
             Text = "登出",
-            Location = new Point(315, 248),
+            Location = new Point(315, 240),
             Size = new Size(85, 32),
             BackColor = Color.FromArgb(244, 67, 54),
             ForeColor = Color.White,
@@ -133,11 +157,11 @@ public partial class MainForm : Form
         _btnLogout.Click += BtnLogout_Click;
 
         // 输出
-        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 295), Size = new Size(100, 20) };
+        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 290), Size = new Size(100, 20) };
         _txtOutput = new TextBox
         {
-            Location = new Point(20, 315),
-            Size = new Size(500, 130),
+            Location = new Point(20, 310),
+            Size = new Size(500, 145),
             Multiline = true,
             ReadOnly = true,
             ScrollBars = ScrollBars.Vertical,
@@ -149,9 +173,96 @@ public partial class MainForm : Form
         {
             lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword,
             _chkShowPassword, lblIp, _txtIp, _chkAutoDetect, lblAcId, _txtAcId,
-            lblAcIdNote, lblDomain, _txtDomain, _btnLogin, _btnInfo, _btnLogout,
-            lblOutput, _txtOutput
+            lblAcIdNote, lblDomain, _txtDomain, _chkSaveConfig,
+            _btnLogin, _btnInfo, _btnLogout, lblOutput, _txtOutput
         });
+    }
+
+    private void LoadConfig()
+    {
+        try
+        {
+            if (File.Exists(_configPath))
+            {
+                var json = File.ReadAllText(_configPath);
+                var config = JsonSerializer.Deserialize<Config>(json);
+                if (config != null)
+                {
+                    SetTextBoxIfPlaceholder(_txtUrl, config.Url ?? "http://10.0.0.1");
+                    SetTextBoxIfPlaceholder(_txtUsername, config.Username ?? "");
+                    if (!string.IsNullOrEmpty(config.Password))
+                    {
+                        SetTextBoxIfPlaceholder(_txtPassword, config.Password);
+                    }
+                    SetTextBoxIfPlaceholder(_txtDomain, config.Domain ?? "@edu.cn");
+                    _chkAutoDetect.Checked = config.AutoDetectIp;
+                    if (!string.IsNullOrEmpty(config.AcId))
+                    {
+                        SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
+                    }
+                    _chkSaveConfig.Checked = true;
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void SetTextBoxIfPlaceholder(TextBox txt, string value)
+    {
+        if (txt.Text == txt.Tag?.ToString() || string.IsNullOrWhiteSpace(txt.Text))
+        {
+            txt.Text = value;
+            txt.ForeColor = Color.Black;
+        }
+    }
+
+    private void SaveConfig()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(_configPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var config = new Config
+            {
+                Url = GetActualText(_txtUrl, "http://10.0.0.1"),
+                Username = GetActualText(_txtUsername),
+                Password = GetActualText(_txtPassword, ""),
+                Domain = GetActualText(_txtDomain, ""),
+                AutoDetectIp = _chkAutoDetect.Checked,
+                AcId = _txtAcId.Text == "留空自动检测" ? "" : _txtAcId.Text
+            };
+
+            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_configPath, json);
+            AppendOutput("[配置] 已保存\n");
+        }
+        catch (Exception ex)
+        {
+            AppendOutput($"[配置] 保存失败：{ex.Message}\n");
+        }
+    }
+
+    private void DeleteConfig()
+    {
+        try
+        {
+            if (File.Exists(_configPath))
+                File.Delete(_configPath);
+            AppendOutput("[配置] 已删除\n");
+        }
+        catch { }
+    }
+
+    private class Config
+    {
+        public string? Url { get; set; }
+        public string? Username { get; set; }
+        public string? Password { get; set; }
+        public string? Domain { get; set; }
+        public bool AutoDetectIp { get; set; } = true;
+        public string? AcId { get; set; }
     }
 
     private static TextBox CreatePlaceholderTextBox(int x, int y, int width, int height, string placeholder)
@@ -163,18 +274,15 @@ public partial class MainForm : Form
             Tag = placeholder
         };
 
-        var placeholderColor = Color.Gray;
-        var normalColor = Color.Black;
-
         txt.Text = placeholder;
-        txt.ForeColor = placeholderColor;
+        txt.ForeColor = Color.Gray;
 
         txt.GotFocus += (s, e) =>
         {
             if (txt.Text == placeholder)
             {
                 txt.Text = "";
-                txt.ForeColor = normalColor;
+                txt.ForeColor = Color.Black;
                 if (txt.Tag?.ToString() == "请输入密码")
                     txt.UseSystemPasswordChar = true;
             }
@@ -185,7 +293,7 @@ public partial class MainForm : Form
             if (string.IsNullOrWhiteSpace(txt.Text))
             {
                 txt.Text = placeholder;
-                txt.ForeColor = placeholderColor;
+                txt.ForeColor = Color.Gray;
                 if (txt.Tag?.ToString() == "请输入密码")
                     txt.UseSystemPasswordChar = true;
             }
@@ -196,7 +304,6 @@ public partial class MainForm : Form
 
     private async void BtnLogin_Click(object? sender, EventArgs e)
     {
-        // 获取实际值（忽略占位符）
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
         var username = GetActualText(_txtUsername);
         var password = GetActualText(_txtPassword, "");
@@ -219,6 +326,10 @@ public partial class MainForm : Form
             MessageBox.Show("请输入密码", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+
+        // 保存配置
+        if (_chkSaveConfig.Checked)
+            SaveConfig();
 
         SetButtonsEnabled(false);
         AppendOutput("=== 登录尝试 ===\n");
