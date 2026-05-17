@@ -39,11 +39,12 @@ public partial class MainForm : Form
     {
         InitializeComponent();
         LoadConfig();
-        // 延迟设置焦点，等待所有控件加载完成
-        BeginInvoke(new Action(() =>
-        {
-            _hiddenFocus.Focus();
-        }));
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        _hiddenFocus.Focus();
     }
 
     private void InitializeComponent()
