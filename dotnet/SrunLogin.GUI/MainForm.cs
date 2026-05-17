@@ -140,27 +140,26 @@ public partial class MainForm : Form
 
         // 网关地址
         var lblUrl = CreateLabel("网关地址", marginX, y);
-        _txtUrl = CreateModernTextBox(inputX, y, inputW, "http://10.0.0.1");
+        _txtUrl = CreateModernTextBox(inputX, y, inputW, "例:http://10.0.0.1");
         y += 46;
 
         // 用户名
         var lblUser = CreateLabel("用户名", marginX, y);
-        _txtUsername = CreateModernTextBox(inputX, y, inputW, "请输入用户名");
+        _txtUsername = CreateModernTextBox(inputX, y, inputW, "例:学号/工号");
         y += 46;
 
         // 密码
         var lblPwd = CreateLabel("密码", marginX, y);
-        _txtPassword = CreateModernTextBox(inputX, y, inputW - 250, "请输入密码");
+        _txtPassword = CreateModernTextBox(inputX, y, 170, "例:密码");
         _txtPassword.UseSystemPasswordChar = true;
 
         int checkY = y + 2;
-        int checkX = inputX + inputW - 240;
 
         _chkShowPassword = new CheckBox
         {
             Text = "显示",
-            Location = new Point(checkX, checkY),
-            Size = new Size(60, 20),
+            Location = new Point(inputX + 190, checkY),
+            Size = new Size(50, 20),
             FlatStyle = FlatStyle.Flat,
             ForeColor = ColorLabel,
             Font = new Font("Segoe UI", 8.5F)
@@ -173,9 +172,10 @@ public partial class MainForm : Form
         _chkSaveConfig = new CheckBox
         {
             Text = "保存配置",
-            Location = new Point(checkX + 70, checkY),
-            Size = new Size(90, 20),
+            Location = new Point(inputX + 245, checkY),
+            Size = new Size(80, 20),
             FlatStyle = FlatStyle.Flat,
+            Checked = true,
             ForeColor = ColorLabel,
             Font = new Font("Segoe UI", 8.5F)
         };
@@ -187,9 +187,10 @@ public partial class MainForm : Form
         _chkAutoLogin = new CheckBox
         {
             Text = "自动登录",
-            Location = new Point(checkX + 165, checkY),
-            Size = new Size(90, 20),
+            Location = new Point(inputX + 330, checkY),
+            Size = new Size(80, 20),
             FlatStyle = FlatStyle.Flat,
+            Checked = true,
             ForeColor = ColorLabel,
             Font = new Font("Segoe UI", 8.5F)
         };
@@ -212,18 +213,7 @@ public partial class MainForm : Form
 
         // 域
         var lblDomain = CreateLabel("域", marginX, y);
-        _txtDomain = CreateModernTextBox(inputX, y, 340, "@edu.cn");
-
-        _chkSaveConfig = new CheckBox
-        {
-            Text = "保存配置",
-            Location = new Point(inputX + 360, y + 2),
-            Size = new Size(90, 20),
-            FlatStyle = FlatStyle.Flat,
-            Checked = true,
-            ForeColor = ColorLabel,
-            Font = new Font("Segoe UI", 9F)
-        };
+        _txtDomain = CreateModernTextBox(inputX, y, inputW, "@edu.cn");
         y += 58;
 
         // 按钮区域 - 等宽均匀分布
@@ -338,7 +328,7 @@ public partial class MainForm : Form
             {
                 txt.Text = "";
                 txt.ForeColor = ColorText;
-                if (placeholder == "请输入密码")
+                if (placeholder == "例:密码")
                     txt.UseSystemPasswordChar = true;
             }
             underline.BackColor = ColorPrimary;
@@ -351,7 +341,7 @@ public partial class MainForm : Form
             {
                 txt.Text = placeholder;
                 txt.ForeColor = Color.Gray;
-                if (placeholder == "请输入密码")
+                if (placeholder == "例:密码")
                     txt.UseSystemPasswordChar = true;
             }
             underline.BackColor = ColorBorder;
@@ -386,17 +376,35 @@ public partial class MainForm : Form
                 var config = JsonSerializer.Deserialize<Config>(json);
                 if (config != null)
                 {
-                    SetTextBoxIfPlaceholder(_txtUrl, config.Url ?? "http://10.0.0.1");
-                    SetTextBoxIfPlaceholder(_txtUsername, config.Username ?? "");
+                    // 直接设置值，不检查placeholder
+                    _txtUrl.Text = config.Url ?? "http://10.0.0.1";
+                    _txtUrl.ForeColor = ColorText;
+
+                    _txtUsername.Text = config.Username ?? "";
+                    _txtUsername.ForeColor = ColorText;
+
                     if (!string.IsNullOrEmpty(config.Password))
-                        SetTextBoxIfPlaceholder(_txtPassword, config.Password);
-                    SetTextBoxIfPlaceholder(_txtDomain, config.Domain ?? "@edu.cn");
-                    if (!string.IsNullOrEmpty(config.Ip) && config.Ip != _txtIp.Tag?.ToString())
                     {
-                        SetTextBoxIfPlaceholder(_txtIp, config.Ip);
+                        _txtPassword.Text = config.Password;
+                        _txtPassword.ForeColor = ColorText;
+                        _txtPassword.UseSystemPasswordChar = true;
                     }
-                    if (!string.IsNullOrEmpty(config.AcId) && config.AcId != _txtAcId.Tag?.ToString())
-                        SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
+
+                    _txtDomain.Text = config.Domain ?? "@edu.cn";
+                    _txtDomain.ForeColor = ColorText;
+
+                    if (!string.IsNullOrEmpty(config.Ip))
+                    {
+                        _txtIp.Text = config.Ip;
+                        _txtIp.ForeColor = ColorText;
+                    }
+
+                    if (!string.IsNullOrEmpty(config.AcId))
+                    {
+                        _txtAcId.Text = config.AcId;
+                        _txtAcId.ForeColor = ColorText;
+                    }
+
                     _chkSaveConfig.Checked = true;
                     _chkAutoLogin.Checked = config.AutoLogin;
                 }
