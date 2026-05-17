@@ -48,10 +48,6 @@ public partial class MainForm : Form
     private CheckBox _chkShowPassword = null!;
     private CheckBox _chkAutoLogin = null!;
 
-    private string? _lastAcId;
-    private string? _lastIp;
-
-    // 现代配色
     private static readonly Color ColorBg = Color.FromArgb(248, 249, 250);
     private static readonly Color ColorPrimary = Color.FromArgb(0, 120, 215);
     private static readonly Color ColorInfo = Color.FromArgb(0, 150, 136);
@@ -154,13 +150,16 @@ public partial class MainForm : Form
 
         // 密码
         var lblPwd = CreateLabel("密码", marginX, y);
-        _txtPassword = CreateModernTextBox(inputX, y, inputW - 80, "请输入密码");
+        _txtPassword = CreateModernTextBox(inputX, y, inputW - 250, "请输入密码");
         _txtPassword.UseSystemPasswordChar = true;
+
+        int checkY = y + 2;
+        int checkX = inputX + inputW - 240;
 
         _chkShowPassword = new CheckBox
         {
             Text = "显示",
-            Location = new Point(inputX + inputW - 70, y + 2),
+            Location = new Point(checkX, checkY),
             Size = new Size(60, 20),
             FlatStyle = FlatStyle.Flat,
             ForeColor = ColorLabel,
@@ -169,6 +168,30 @@ public partial class MainForm : Form
         _chkShowPassword.CheckedChanged += (s, e) =>
         {
             _txtPassword.UseSystemPasswordChar = !_chkShowPassword.Checked;
+        };
+
+        _chkSaveConfig = new CheckBox
+        {
+            Text = "保存配置",
+            Location = new Point(checkX + 70, checkY),
+            Size = new Size(90, 20),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 8.5F)
+        };
+        _chkSaveConfig.CheckedChanged += (s, e) =>
+        {
+            if (_chkSaveConfig.Checked) SaveConfig(); else DeleteConfig();
+        };
+
+        _chkAutoLogin = new CheckBox
+        {
+            Text = "自动登录",
+            Location = new Point(checkX + 165, checkY),
+            Size = new Size(90, 20),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 8.5F)
         };
         y += 46;
 
@@ -198,20 +221,6 @@ public partial class MainForm : Form
             Size = new Size(90, 20),
             FlatStyle = FlatStyle.Flat,
             Checked = true,
-            ForeColor = ColorLabel,
-            Font = new Font("Segoe UI", 9F)
-        };
-        _chkSaveConfig.CheckedChanged += (s, e) =>
-        {
-            if (_chkSaveConfig.Checked) SaveConfig(); else DeleteConfig();
-        };
-
-        _chkAutoLogin = new CheckBox
-        {
-            Text = "自动登录",
-            Location = new Point(inputX + 460, y + 2),
-            Size = new Size(90, 20),
-            FlatStyle = FlatStyle.Flat,
             ForeColor = ColorLabel,
             Font = new Font("Segoe UI", 9F)
         };
@@ -527,21 +536,38 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         SetButtonsEnabled(false);
         Log("=== 登录尝试 ===");
 
+        // 用户是否手动指定了 IP 或 AC_ID
+        bool userProvidedIp = !IsPlaceholder(_txtIp);
+        bool userProvidedAcId = !IsPlaceholder(_txtAcId);
+
         try
         {
             var portal = new SrunPortal(url, username, password, acId, ip, domain);
             portal.DebugLog = LogDebug;
-            await portal.DetectInfoAsync();
 
-            var ipResult = portal.GetDetectedIp();
-            var acIdResult = portal.GetDetectedAcId();
-            Log($"检测结果 - IP: {ipResult}, AC_ID: {acIdResult}");
-
-            _lastIp = ipResult;
-            _lastAcId = acIdResult;
+            // 如果用户没有提供 IP/AC_ID，先自动检测
+            if (!userProvidedIp && !userProvidedAcId)
+            {
+                await portal.DetectInfoAsync();
+                ip = portal.GetDetectedIp();
+                acId = portal.GetDetectedAcId();
+                Log($"自动检测结果 - IP: {ip}, AC_ID: {acId}");
+            }
 
             var result = await portal.LoginAsync();
             Log($"结果: {result.Error}");
+
+            // 如果用户提供了信息但登录失败，尝试自动检测后重试
+            if (!result.IsSuccess && (userProvidedIp || userProvidedAcId))
+            {
+                Log("使用用户指定参数登录失败，尝试自动检测...");
+                await portal.DetectInfoAsync();
+                ip = portal.GetDetectedIp();
+                acId = portal.GetDetectedAcId();
+                Log($"自动检测结果 - IP: {ip}, AC_ID: {acId}");
+                result = await portal.LoginAsync();
+                Log($"结果: {result.Error}");
+            }
 
             if (result.IsSuccess)
             {
@@ -576,8 +602,6 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         }
 
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
-        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
-        var ip = string.IsNullOrWhiteSpace(_txtIp.Text) ? null : _txtIp.Text.Trim();
         var domain = GetActualText(_txtDomain, "");
 
         SetButtonsEnabled(false);
@@ -585,9 +609,10 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
         try
         {
-            var portal = new SrunPortal(url, username, "", acId, ip, domain);
+            var portal = new SrunPortal(url, username, "", null, null, domain);
             portal.DebugLog = LogDebug;
             await portal.DetectInfoAsync();
+            Log($"检测结果 - IP: {portal.GetDetectedIp()}, AC_ID: {portal.GetDetectedAcId()}");
             await QueryStatus(portal);
         }
         catch (Exception ex)
@@ -610,8 +635,6 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         }
 
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
-        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
-        var ip = string.IsNullOrWhiteSpace(_txtIp.Text) ? (_lastIp ?? "") : _txtIp.Text.Trim();
         var domain = GetActualText(_txtDomain, "");
 
         SetButtonsEnabled(false);
@@ -619,9 +642,10 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
         try
         {
-            var portal = new SrunPortal(url, username, "", acId, ip, domain);
+            var portal = new SrunPortal(url, username, "", null, null, domain);
             portal.DebugLog = LogDebug;
             await portal.DetectInfoAsync();
+            Log($"检测结果 - IP: {portal.GetDetectedIp()}, AC_ID: {portal.GetDetectedAcId()}");
             var result = await portal.LogoutAsync();
 
             if (result.IsSuccess)
