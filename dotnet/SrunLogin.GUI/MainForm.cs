@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SrunLogin.Crypto;
@@ -60,6 +61,15 @@ public partial class MainForm : Form
     private Panel? _advancedPanel;
     private bool _isAdvancedExpanded = false;
     private const int ExpandedWidth = 200;
+
+    private System.Windows.Forms.Timer? _loopTimer;
+    private CheckBox? _chkLoopEnable = null!;
+    private TextBox? _txtLoopInterval = null!;
+    private TextBox? _txtLoopTimeout = null!;
+    private Label? _lblLoopStatus = null!;
+    private TextBox? _txtPingHost = null!;
+    private bool _isLoopRunning = false;
+    private int _lastCheckTime = 0;
 
     private string ConfigPath
     {
@@ -131,7 +141,7 @@ public partial class MainForm : Form
         // 高级功能按钮（竖着的侧边栏按钮，位于窗口右侧）
         var btnAdvanced = new Label
         {
-            Text = "高\n级\n功\n能\n▶",
+            Text = "▶\n高\n级\n功\n能\n▶",
             Location = new Point(590, 200),
             Size = new Size(35, 180),
             BackColor = ColorPrimary,
@@ -144,13 +154,14 @@ public partial class MainForm : Form
         {
             _isAdvancedExpanded = !_isAdvancedExpanded;
             Size = new Size(_isAdvancedExpanded ? 840 : 640, Height);
-            btnAdvanced.Text = _isAdvancedExpanded ? "高\n级\n功\n能\n◀" : "高\n级\n功\n能\n▶";
+            _advancedPanel!.Visible = _isAdvancedExpanded;
+            btnAdvanced.Text = _isAdvancedExpanded ? "◀\n高\n级\n功\n能\n◀" : "▶\n高\n级\n功\n能\n▶";
         };
 
         // 高级功能面板（右侧折叠区域）
         _advancedPanel = new Panel
         {
-            Location = new Point(640, 0),
+            Location = new Point(620, 0),
             Size = new Size(ExpandedWidth, 680),
             BackColor = Color.FromArgb(230, 235, 240),
             Visible = false
@@ -165,6 +176,119 @@ public partial class MainForm : Form
             ForeColor = ColorText
         };
         _advancedPanel.Controls.Add(lblAdvancedTitle);
+
+        // 循环检测登陆功能
+        int advY = 50;
+
+        var lblLoopTitle = new Label
+        {
+            Text = "循环检测登陆",
+            Location = new Point(10, advY),
+            Size = new Size(180, 20),
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = ColorText
+        };
+        _advancedPanel.Controls.Add(lblLoopTitle);
+        advY += 30;
+
+        _chkLoopEnable = new CheckBox
+        {
+            Text = "启用循环检测",
+            Location = new Point(10, advY),
+            Size = new Size(150, 20),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = ColorText,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _chkLoopEnable.CheckedChanged += (s, e) =>
+        {
+            if (_chkSaveConfig!.Checked)
+                SaveConfig();
+
+            if (_chkLoopEnable!.Checked)
+            {
+                StartLoopDetection();
+            }
+            else
+            {
+                StopLoopDetection();
+            }
+        };
+        _advancedPanel.Controls.Add(_chkLoopEnable);
+        advY += 28;
+
+        var lblInterval = new Label
+        {
+            Text = "检测间隔(秒):",
+            Location = new Point(10, advY),
+            Size = new Size(100, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _advancedPanel.Controls.Add(lblInterval);
+
+        _txtLoopInterval = new TextBox
+        {
+            Location = new Point(10, advY + 22),
+            Size = new Size(80, 24),
+            Text = "60",
+            Font = new Font("Segoe UI", 9F),
+            BackColor = Color.White
+        };
+        _advancedPanel.Controls.Add(_txtLoopInterval);
+        advY += 52;
+
+        var lblTimeout = new Label
+        {
+            Text = "网络超时(秒):",
+            Location = new Point(10, advY),
+            Size = new Size(100, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _advancedPanel.Controls.Add(lblTimeout);
+
+        _txtLoopTimeout = new TextBox
+        {
+            Location = new Point(10, advY + 22),
+            Size = new Size(80, 24),
+            Text = "5",
+            Font = new Font("Segoe UI", 9F),
+            BackColor = Color.White
+        };
+        _advancedPanel.Controls.Add(_txtLoopTimeout);
+        advY += 52;
+
+        var lblPingHost = new Label
+        {
+            Text = "Ping主机:",
+            Location = new Point(10, advY),
+            Size = new Size(100, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _advancedPanel.Controls.Add(lblPingHost);
+
+        _txtPingHost = new TextBox
+        {
+            Location = new Point(10, advY + 22),
+            Size = new Size(150, 24),
+            Text = "www.baidu.com",
+            Font = new Font("Segoe UI", 9F),
+            BackColor = Color.White
+        };
+        _advancedPanel.Controls.Add(_txtPingHost);
+        advY += 52;
+
+        _lblLoopStatus = new Label
+        {
+            Text = "状态: 未启动",
+            Location = new Point(10, advY),
+            Size = new Size(180, 20),
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _advancedPanel.Controls.Add(_lblLoopStatus);
 
         // 分隔线
         var line = new Panel
@@ -450,6 +574,14 @@ public partial class MainForm : Form
 
                     _chkSaveConfig.Checked = true;
                     _chkAutoLogin.Checked = config.AutoLogin;
+
+                    if (config.Loop != null)
+                    {
+                        _chkLoopEnable!.Checked = config.Loop.Enable;
+                        _txtLoopInterval!.Text = config.Loop.Interval.ToString();
+                        _txtLoopTimeout!.Text = config.Loop.Timeout.ToString();
+                        _txtPingHost!.Text = config.Loop.PingHost;
+                    }
                 }
             }
         }
@@ -481,7 +613,14 @@ public partial class MainForm : Form
                 Ip = IsPlaceholder(_txtIp) ? "" : _txtIp.Text.Trim(),
                 Domain = GetActualText(_txtDomain, ""),
                 AcId = IsPlaceholder(_txtAcId) ? "" : _txtAcId.Text.Trim(),
-                AutoLogin = _chkAutoLogin.Checked
+                AutoLogin = _chkAutoLogin.Checked,
+                Loop = new LoopConfig
+                {
+                    Enable = _chkLoopEnable!.Checked,
+                    Interval = int.TryParse(_txtLoopInterval!.Text, out var interval) ? interval : 60,
+                    Timeout = int.TryParse(_txtLoopTimeout!.Text, out var timeout) ? timeout : 5,
+                    PingHost = _txtPingHost!.Text
+                }
             };
 
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
@@ -514,6 +653,15 @@ public partial class MainForm : Form
         public string? Domain { get; set; }
         public string? AcId { get; set; }
         public bool AutoLogin { get; set; }
+        public LoopConfig? Loop { get; set; }
+    }
+
+    private class LoopConfig
+    {
+        public bool Enable { get; set; }
+        public int Interval { get; set; } = 60;
+        public int Timeout { get; set; } = 5;
+        public string PingHost { get; set; } = "www.baidu.com";
     }
 
     private void ShowHelp()
@@ -792,6 +940,125 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             File.AppendAllText(LogPath, logLine);
         }
         catch { }
+    }
+
+    private void StartLoopDetection()
+    {
+        int interval = 60;
+        if (!int.TryParse(_txtLoopInterval!.Text, out interval) || interval < 5)
+        {
+            interval = 60;
+        }
+
+        if (_loopTimer != null)
+        {
+            _loopTimer.Stop();
+            _loopTimer.Dispose();
+        }
+
+        _loopTimer = new System.Windows.Forms.Timer();
+        _loopTimer.Interval = interval * 1000;
+        _loopTimer.Tick += async (s, e) =>
+        {
+            await PerformLoopCheck();
+        };
+        _loopTimer.Start();
+        _isLoopRunning = true;
+        _lastCheckTime = Environment.TickCount;
+
+        _lblLoopStatus!.Text = $"状态: 检测中 ({interval}秒)";
+        Log("[循环检测] 已启动");
+    }
+
+    private void StopLoopDetection()
+    {
+        if (_loopTimer != null)
+        {
+            _loopTimer.Stop();
+            _loopTimer.Dispose();
+            _loopTimer = null;
+        }
+        _isLoopRunning = false;
+        _lblLoopStatus!.Text = "状态: 已停止";
+        Log("[循环检测] 已停止");
+    }
+
+    private async Task PerformLoopCheck()
+    {
+        if (!_isLoopRunning) return;
+
+        try
+        {
+            // 检查网络连通性
+            int timeout = 5;
+            if (!int.TryParse(_txtLoopTimeout!.Text, out timeout) || timeout < 1)
+            {
+                timeout = 5;
+            }
+
+            bool isOnline = await CheckNetworkOnline();
+            int loopInterval = int.TryParse(_txtLoopInterval!.Text, out int i) && i >= 5 ? i : 60;
+
+            if (!isOnline)
+            {
+                _lblLoopStatus!.Text = $"状态: 网络离线，尝试登录...";
+                Log("[循环检测] 网络离线，尝试自动登录");
+
+                var username = GetActualText(_txtUsername, "");
+                var password = GetActualText(_txtPassword, "");
+
+                if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                {
+                    var url = GetActualText(_txtUrl, "http://10.0.0.1");
+                    var domain = GetActualText(_txtDomain, "");
+
+                    var portal = new SrunPortal(url, username, password, null, null, domain);
+                    portal.DebugLog = LogDebug;
+
+                    await portal.DetectInfoAsync();
+                    var result = await portal.LoginAsync();
+
+                    if (result.IsSuccess)
+                    {
+                        _lblLoopStatus!.Text = $"状态: 登录成功";
+                        Log("[循环检测] 登录成功");
+                    }
+                    else
+                    {
+                        var error = result.ErrorMsg ?? result.Error ?? "未知错误";
+                        _lblLoopStatus!.Text = $"状态: 登录失败";
+                        Log($"[循环检测] 登录失败: {error}");
+                    }
+                }
+            }
+            else
+            {
+                _lblLoopStatus!.Text = $"状态: 在线 ({loopInterval}秒)";
+            }
+        }
+        catch (Exception ex)
+        {
+            _lblLoopStatus!.Text = $"状态: 异常";
+            Log($"[循环检测] 异常: {ex.Message}");
+        }
+    }
+
+    private async Task<bool> CheckNetworkOnline()
+    {
+        try
+        {
+            int timeout = 5;
+            int.TryParse(_txtLoopTimeout!.Text, out timeout);
+            string host = string.IsNullOrWhiteSpace(_txtPingHost!.Text) ? "www.baidu.com" : _txtPingHost.Text;
+
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync(host, timeout * 1000);
+            return reply.Status == IPStatus.Success;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string FormatFlow(long bytes)
