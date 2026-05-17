@@ -1,69 +1,80 @@
-# SrunLogin .NET Build Script
-
 param(
-    [string]$Configuration = "Release",
-    [string]$OutputDir = "publish",
-    [switch]$Clean,
-    [switch]$Run,
-    [switch]$Help
+    [string]$Version = "1.0.0"
 )
 
-$ProjectDir = $PSScriptRoot
-$ProjectFile = Join-Path $ProjectDir "SrunLogin.GUI\SrunLogin.GUI.csproj"
-$OutputPath = Join-Path $ProjectDir $OutputDir
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$OriginalDir = Get-Location
+Set-Location $ScriptDir
 
-if ($Help) {
-    Write-Host @"
-SrunLogin Build Script
-======================
+$CONFIG = "Release"
+$OUTPUT_DIR = "publish"
 
-Usage:
-    .\build.ps1                          # Release build
-    .\build.ps1 -Configuration Debug      # Debug build
-    .\build.ps1 -OutputDir out            # Custom output dir
-    .\build.ps1 -Clean                   # Clean before build
-    .\build.ps1 -Run                     # Run after build
-    .\build.ps1 -Help                    # Show help
-
-Note:
-    This builds a framework-dependent exe.
-    Requires .NET runtime installed on target machine.
-
-"@
-    exit 0
-}
-
-Write-Host "=== SrunLogin Build Script ===" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "SrunLogin Build Script v$Version" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Clean
-if ($Clean) {
-    Write-Host "[Clean] Removing build artifacts..." -ForegroundColor Yellow
-    Get-ChildItem -Path $ProjectDir -Include "bin", "obj" -Recurse -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path $OutputPath -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "[Clean] Done" -ForegroundColor Green
+# Clean old files
+Write-Host "Cleaning old files..." -ForegroundColor Yellow
+
+$exePath = Join-Path $OUTPUT_DIR "SrunLogin.GUI.exe"
+if (Test-Path $exePath) {
+    $process = Get-Process -Name "SrunLogin.GUI" -ErrorAction SilentlyContinue
+    if ($process) {
+        Stop-Process -Name "SrunLogin.GUI" -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+    }
 }
 
-# Publish
-Write-Host "[Publish] Publishing..." -ForegroundColor Yellow
-Remove-Item -Path $OutputPath -Recurse -Force -ErrorAction SilentlyContinue
+# Retry deletion
+$retryCount = 3
+for ($i = 0; $i -lt $retryCount; $i++) {
+    try {
+        if (Test-Path $OUTPUT_DIR) {
+            Remove-Item -Recurse -Force $OUTPUT_DIR -ErrorAction Stop
+        }
+        break
+    }
+    catch {
+        if ($i -lt ($retryCount - 1)) {
+            Start-Sleep -Milliseconds 500
+        }
+        else {
+            Write-Host "[ERROR] Cannot clean output directory. Is the exe file still running?" -ForegroundColor Red
+            exit 1
+        }
+    }
+}
 
-dotnet publish $ProjectFile -c $Configuration -o $OutputPath `
+# Build single file exe (framework-dependent)
+Write-Host ""
+Write-Host "Building single file exe..." -ForegroundColor Yellow
+dotnet publish SrunLogin.GUI/SrunLogin.GUI.csproj `
+    -c $CONFIG `
+    -p:SelfContained=false `
+    -p:PublishSingleFile=true `
     -p:DebugType=none `
-    -p:DebugSymbols=false
+    -p:DebugSymbols=false `
+    -p:Version=$Version `
+    -p:AssemblyVersion=$Version `
+    -p:FileVersion=$Version `
+    -o ./$OUTPUT_DIR
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[Error] Publish failed!" -ForegroundColor Red
-    exit 1
-}
-Write-Host "[Publish] Published to: $OutputPath" -ForegroundColor Green
-
-# Run
-if ($Run) {
     Write-Host ""
-    Write-Host "[Run] Starting program..." -ForegroundColor Cyan
-    & (Join-Path $OutputPath "SrunLogin.GUI.exe")
+    Write-Host "[ERROR] Build failed!" -ForegroundColor Red
+    exit 1
 }
 
 Write-Host ""
-Write-Host "=== Done ===" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "Build completed successfully!" -ForegroundColor Green
+Write-Host "Output: ./$OUTPUT_DIR/" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Files in output directory:" -ForegroundColor Yellow
+Get-ChildItem $OUTPUT_DIR | ForEach-Object { Write-Host "  $($_.Name)" }
+
+# 恢复原来目录
+Set-Location $OriginalDir
