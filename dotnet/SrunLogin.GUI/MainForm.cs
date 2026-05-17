@@ -64,7 +64,6 @@ public partial class MainForm : Form
     {
         // 禁用DPI缩放
         this.AutoScaleMode = AutoScaleMode.None;
-        this.Font = new Font(this.Font.FontFamily, 12);
 
         InitializeComponent();
         LoadConfig();
@@ -128,14 +127,14 @@ public partial class MainForm : Form
 
         // 域
         var lblDomain = new Label { Text = "域:", Location = new Point(20, 180), Size = new Size(90, 20) };
-        _txtDomain = CreatePlaceholderTextBox(115, 178, 370, 22, "@edu.cn");
+        _txtDomain = CreatePlaceholderTextBox(115, 178, 300, 22, "@edu.cn");
 
         // 保存配置
         _chkSaveConfig = new CheckBox
         {
             Text = "保存配置",
-            Location = new Point(485, 178),
-            Size = new Size(55, 20),
+            Location = new Point(415, 178),
+            Size = new Size(100, 20),
             FlatStyle = FlatStyle.Flat,
             Checked = true
         };
