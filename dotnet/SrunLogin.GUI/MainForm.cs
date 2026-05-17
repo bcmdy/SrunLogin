@@ -62,6 +62,10 @@ public partial class MainForm : Form
 
     public MainForm()
     {
+        // 禁用DPI缩放
+        this.AutoScaleMode = AutoScaleMode.None;
+        this.Font = new Font(this.Font.FontFamily, 12);
+
         InitializeComponent();
         LoadConfig();
     }
@@ -239,6 +243,10 @@ public partial class MainForm : Form
                         SetTextBoxIfPlaceholder(_txtPassword, config.Password);
                     }
                     SetTextBoxIfPlaceholder(_txtDomain, config.Domain ?? "@edu.cn");
+                    if (!string.IsNullOrEmpty(config.Ip) && config.Ip != _txtIp.Tag?.ToString())
+                    {
+                        SetTextBoxIfPlaceholder(_txtIp, config.Ip);
+                    }
                     if (!string.IsNullOrEmpty(config.AcId) && config.AcId != _txtAcId.Tag?.ToString())
                     {
                         SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
@@ -272,6 +280,7 @@ public partial class MainForm : Form
                 Url = GetActualText(_txtUrl, "http://10.0.0.1"),
                 Username = GetActualText(_txtUsername),
                 Password = GetActualText(_txtPassword, ""),
+                Ip = IsPlaceholder(_txtIp) ? "" : _txtIp.Text.Trim(),
                 Domain = GetActualText(_txtDomain, ""),
                 AcId = IsPlaceholder(_txtAcId) ? "" : _txtAcId.Text.Trim()
             };
@@ -302,6 +311,7 @@ public partial class MainForm : Form
         public string? Url { get; set; }
         public string? Username { get; set; }
         public string? Password { get; set; }
+        public string? Ip { get; set; }
         public string? Domain { get; set; }
         public string? AcId { get; set; }
     }
