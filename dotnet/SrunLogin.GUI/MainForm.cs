@@ -19,6 +19,8 @@ public partial class MainForm : Form
     private Button _btnInfo = null!;
     private TextBox _txtOutput = null!;
     private CheckBox _chkSaveConfig = null!;
+
+    private TextBox _hiddenFocus = null!;
     private CheckBox _chkShowPassword = null!;
 
     private string? _lastAcId;
@@ -179,8 +181,16 @@ public partial class MainForm : Form
             _btnLogin, _btnInfo, _btnLogout, lblOutput, _txtOutput
         });
 
-        // 将焦点设置到输出文本框，避免文本框获得焦点导致占位符消失
-        _txtOutput.Focus();
+        // 创建隐藏文本框用于默认焦点，避免文本框获得焦点导致占位符消失
+        _hiddenFocus = new TextBox
+        {
+            Location = new Point(-100, -100),
+            Size = new Size(1, 1),
+            TabStop = false,
+            Visible = false
+        };
+        Controls.Add(_hiddenFocus);
+        _hiddenFocus.Focus();
     }
 
     private void LoadConfig()
@@ -364,8 +374,8 @@ AC ID
         var url = GetActualText(_txtUrl, "http://10.0.0.1");
         var username = GetActualText(_txtUsername);
         var password = GetActualText(_txtPassword, "");
-        var ip = string.IsNullOrWhiteSpace(_txtIp.Text) ? null : _txtIp.Text.Trim();
-        var acId = string.IsNullOrWhiteSpace(_txtAcId.Text) ? null : _txtAcId.Text.Trim();
+        var ip = IsPlaceholder(_txtIp) ? null : _txtIp.Text.Trim();
+        var acId = IsPlaceholder(_txtAcId) ? null : _txtAcId.Text.Trim();
         var domain = GetActualText(_txtDomain, "");
 
         if (string.IsNullOrWhiteSpace(url))
@@ -513,6 +523,12 @@ AC ID
         if (txt.Text == placeholder)
             return defaultValue;
         return txt.Text.Trim();
+    }
+
+    private static bool IsPlaceholder(TextBox txt)
+    {
+        var placeholder = txt.Tag?.ToString() ?? "";
+        return string.IsNullOrWhiteSpace(txt.Text) || txt.Text == placeholder;
     }
 
     private async Task QueryStatus(SrunPortal portal)
