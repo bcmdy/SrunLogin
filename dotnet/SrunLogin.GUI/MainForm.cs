@@ -46,7 +46,7 @@ public partial class MainForm : Form
     private RichTextBox _txtOutput = null!;
     private CheckBox _chkSaveConfig = null!;
     private CheckBox _chkShowPassword = null!;
-    private CheckBox _chkAutoLogin = null!
+    private CheckBox _chkAutoLogin = null!;
 
     private string? _lastAcId;
     private string? _lastIp;
