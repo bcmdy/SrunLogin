@@ -46,6 +46,7 @@ public partial class MainForm : Form
     private RichTextBox _txtOutput = null!;
     private CheckBox _chkSaveConfig = null!;
     private CheckBox _chkShowPassword = null!;
+    private CheckBox _chkAutoLogin = null!
 
     private string? _lastAcId;
     private string? _lastIp;
@@ -89,6 +90,19 @@ public partial class MainForm : Form
     {
         base.OnShown(e);
         ActiveControl = null;
+
+        // 自动登录
+        if (_chkAutoLogin.Checked)
+        {
+            var url = GetActualText(_txtUrl, "");
+            var username = GetActualText(_txtUsername, "");
+            var password = GetActualText(_txtPassword, "");
+
+            if (!string.IsNullOrEmpty(url) && !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            {
+                BtnLogin_Click(null, EventArgs.Empty);
+            }
+        }
     }
 
     private void InitializeComponent()
@@ -191,6 +205,16 @@ public partial class MainForm : Form
         {
             if (_chkSaveConfig.Checked) SaveConfig(); else DeleteConfig();
         };
+
+        _chkAutoLogin = new CheckBox
+        {
+            Text = "自动登录",
+            Location = new Point(inputX + 460, y + 2),
+            Size = new Size(90, 20),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = ColorLabel,
+            Font = new Font("Segoe UI", 9F)
+        };
         y += 58;
 
         // 按钮区域 - 等宽均匀分布
@@ -256,7 +280,7 @@ public partial class MainForm : Form
         {
             lblTitle, line,
             lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword, _chkShowPassword,
-            lblIp, _txtIp, lblAcId, _txtAcId, lblDomain, _txtDomain, _chkSaveConfig,
+            lblIp, _txtIp, lblAcId, _txtAcId, lblDomain, _txtDomain, _chkSaveConfig, _chkAutoLogin,
             _btnLogin, _btnInfo, _btnLogout, btnHelp,
             lblOutput, outputPanel
         });
@@ -365,6 +389,7 @@ public partial class MainForm : Form
                     if (!string.IsNullOrEmpty(config.AcId) && config.AcId != _txtAcId.Tag?.ToString())
                         SetTextBoxIfPlaceholder(_txtAcId, config.AcId);
                     _chkSaveConfig.Checked = true;
+                    _chkAutoLogin.Checked = config.AutoLogin;
                 }
             }
         }
@@ -395,16 +420,17 @@ public partial class MainForm : Form
                 Password = GetActualText(_txtPassword, ""),
                 Ip = IsPlaceholder(_txtIp) ? "" : _txtIp.Text.Trim(),
                 Domain = GetActualText(_txtDomain, ""),
-                AcId = IsPlaceholder(_txtAcId) ? "" : _txtAcId.Text.Trim()
+                AcId = IsPlaceholder(_txtAcId) ? "" : _txtAcId.Text.Trim(),
+                AutoLogin = _chkAutoLogin.Checked
             };
 
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(ConfigPath, json);
-            AppendOutput("[配置] 已保存\n");
+            Log("[配置] 已保存");
         }
         catch (Exception ex)
         {
-            AppendOutput($"[配置] 保存失败：{ex.Message}\n");
+            Log($"[配置] 保存失败：{ex.Message}");
         }
     }
 
@@ -414,7 +440,7 @@ public partial class MainForm : Form
         {
             if (File.Exists(ConfigPath))
                 File.Delete(ConfigPath);
-            AppendOutput("[配置] 已删除\n");
+            Log("[配置] 已删除");
         }
         catch { }
     }
@@ -427,6 +453,7 @@ public partial class MainForm : Form
         public string? Ip { get; set; }
         public string? Domain { get; set; }
         public string? AcId { get; set; }
+        public bool AutoLogin { get; set; }
     }
 
     private void ShowHelp()
