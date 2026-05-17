@@ -83,11 +83,11 @@ public partial class MainForm : Form
 
         // IP地址
         var lblIp = new Label { Text = "IP地址:", Location = new Point(20, 150), Size = new Size(90, 20) };
-        _txtIp = CreatePlaceholderTextBox(115, 148, 150, 22, "");
+        _txtIp = CreatePlaceholderTextBox(115, 148, 130, 22, "留空自动获取");
 
         // AC_ID
-        var lblAcId = new Label { Text = "AC ID:", Location = new Point(270, 150), Size = new Size(60, 20) };
-        _txtAcId = CreatePlaceholderTextBox(335, 148, 130, 22, "");
+        var lblAcId = new Label { Text = "AC ID:", Location = new Point(260, 150), Size = new Size(55, 20) };
+        _txtAcId = CreatePlaceholderTextBox(320, 148, 145, 22, "留空自动获取");
 
         // 域
         var lblDomain = new Label { Text = "域:", Location = new Point(20, 210), Size = new Size(90, 20) };
@@ -99,7 +99,8 @@ public partial class MainForm : Form
             Text = "保存配置",
             Location = new Point(20, 248),
             Size = new Size(90, 20),
-            FlatStyle = FlatStyle.Flat
+            FlatStyle = FlatStyle.Flat,
+            Checked = true
         };
         _chkSaveConfig.CheckedChanged += (s, e) =>
         {
@@ -178,8 +179,8 @@ public partial class MainForm : Form
             _btnLogin, _btnInfo, _btnLogout, lblOutput, _txtOutput
         });
 
-        // 将焦点设置到保存配置复选框，避免文本框获得焦点导致占位符消失
-        _chkSaveConfig.Focus();
+        // 将焦点设置到输出文本框，避免文本框获得焦点导致占位符消失
+        _txtOutput.Focus();
     }
 
     private void LoadConfig()
@@ -284,11 +285,11 @@ public partial class MainForm : Form
 
 IP地址
   本机在校园网中的 IP 地址
-  留空则自动检测，也可手动指定
+  留空自动获取，也可手动指定
 
 AC ID
   认证设备编号
-  留空则自动检测，如果登录失败可尝试手动指定
+  留空自动获取，如果登录失败可尝试手动指定
 
 域
   部分校园网支持多域认证
