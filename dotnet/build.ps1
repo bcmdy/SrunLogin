@@ -1,4 +1,4 @@
-# SrunLogin .NET 编译脚本
+# SrunLogin .NET Build Script
 
 param(
     [string]$Configuration = "Release",
@@ -9,68 +9,68 @@ param(
 )
 
 $ProjectDir = $PSScriptRoot
-$ProjectFile = Join-Path $ProjectDir "dotnet\SrunLogin.csproj"
+$ProjectFile = Join-Path $ProjectDir "SrunLogin.csproj"
 $OutputPath = Join-Path $ProjectDir $OutputDir
 
 if ($Help) {
     Write-Host @"
-SrunLogin 编译脚本
-==================
+SrunLogin Build Script
+======================
 
-用法:
-    .\build.ps1                    # Release 编译
-    .\build.ps1 -Configuration Debug  # Debug 编译
-    .\build.ps1 -OutputDir out        # 自定义输出目录
-    .\build.ps1 -Clean               # 编译前清理
-    .\build.ps1 -Run                 # 编译后运行
-    .\build.ps1 -Help                # 显示帮助
+Usage:
+    .\build.ps1                     # Release build
+    .\build.ps1 -Configuration Debug  # Debug build
+    .\build.ps1 -OutputDir out        # Custom output dir
+    .\build.ps1 -Clean               # Clean before build
+    .\build.ps1 -Run                 # Run after build
+    .\build.ps1 -Help                # Show help
 
-参数:
-    -Configuration  编译模式 (Release|Debug), 默认: Release
-    -OutputDir      输出目录, 默认: publish
-    -Clean          编译前清理 bin/obj
-    -Run            编译后运行示例
-    -Help           显示帮助
+Options:
+    -Configuration  Build mode (Release|Debug), default: Release
+    -OutputDir      Output directory, default: publish
+    -Clean          Clean bin/obj before build
+    -Run            Run after build
+    -Help           Show this help
 
 "@
     exit 0
 }
 
-Write-Host "=== SrunLogin 编译脚本 ===" -ForegroundColor Cyan
+Write-Host "=== SrunLogin Build Script ===" -ForegroundColor Cyan
 Write-Host ""
 
-# 清理
+# Clean
 if ($Clean) {
-    Write-Host "[清理] 正在清理项目..." -ForegroundColor Yellow
-    Remove-Item -Path (Join-Path $ProjectDir "dotnet\bin") -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path (Join-Path $ProjectDir "dotnet\obj") -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "[Clean] Removing build artifacts..." -ForegroundColor Yellow
+    Remove-Item -Path (Join-Path $ProjectDir "bin") -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path (Join-Path $ProjectDir "obj") -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $OutputPath -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "[清理] 完成" -ForegroundColor Green
+    Write-Host "[Clean] Done" -ForegroundColor Green
 }
 
-# 编译
-Write-Host "[编译] 开始编译 ($Configuration)..." -ForegroundColor Yellow
+# Build
+Write-Host "[Build] Building project ($Configuration)..." -ForegroundColor Yellow
 dotnet build $ProjectFile -c $Configuration
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[错误] 编译失败!" -ForegroundColor Red
+    Write-Host "[Error] Build failed!" -ForegroundColor Red
     exit 1
 }
-Write-Host "[编译] 编译成功" -ForegroundColor Green
+Write-Host "[Build] Build succeeded" -ForegroundColor Green
 
-# 发布
-Write-Host "[发布] 开始发布..." -ForegroundColor Yellow
+# Publish
+Write-Host "[Publish] Publishing..." -ForegroundColor Yellow
 Remove-Item -Path $OutputPath -Recurse -Force -ErrorAction SilentlyContinue
 dotnet publish $ProjectFile -c $Configuration -o $OutputPath
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[错误] 发布失败!" -ForegroundColor Red
+    Write-Host "[Error] Publish failed!" -ForegroundColor Red
     exit 1
 }
-Write-Host "[发布] 发布成功: $OutputPath" -ForegroundColor Green
+Write-Host "[Publish] Published to: $OutputPath" -ForegroundColor Green
 
-# 运行
+# Run
 if ($Run) {
     Write-Host ""
-    Write-Host "[运行] 启动程序..." -ForegroundColor Cyan
+    Write-Host "[Run] Starting program..." -ForegroundColor Cyan
     $exe = Join-Path $OutputPath "SrunLogin.exe"
     if (Test-Path $exe) {
         & $exe --help
@@ -80,4 +80,4 @@ if ($Run) {
 }
 
 Write-Host ""
-Write-Host "=== 完成 ===" -ForegroundColor Cyan
+Write-Host "=== Done ===" -ForegroundColor Cyan
