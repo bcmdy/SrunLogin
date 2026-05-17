@@ -1,3 +1,11 @@
 bin/
 obj/
 publish/
+*.csproj.user
+*.suo
+*.user
+*.userosscache
+SrunLogin.Core/bin/
+SrunLogin.Core/obj/
+SrunLogin.GUI/bin/
+SrunLogin.GUI/obj/

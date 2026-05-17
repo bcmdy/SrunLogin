@@ -37,6 +37,9 @@ public class SrunPortal
 
     private string UsernameWithDomain => _username + _domain;
 
+    public string? GetDetectedIp() => _ip;
+    public string? GetDetectedAcId() => _acId;
+
     public async Task DetectInfoAsync()
     {
         Console.WriteLine($"[诊断] 开始探测 IP/AC_ID...");
