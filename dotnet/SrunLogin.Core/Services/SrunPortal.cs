@@ -25,6 +25,8 @@ public class SrunPortal
     private static readonly Random Random = new();
     private readonly string[] _acIdCandidates = ["143", "2", "3", "5", "10", "15", "20", "100"];
 
+    public Action<string>? DebugLog { get; set; }
+
     public SrunPortal(string authUrl, string username, string password, string? acId = null, string? ip = null, string domain = "")
     {
         _authUrl = authUrl.TrimEnd('/');
@@ -35,6 +37,11 @@ public class SrunPortal
         _ip = ip;
     }
 
+    private void LogDebug(string message)
+    {
+        DebugLog?.Invoke(message);
+    }
+
     private string UsernameWithDomain => _username + _domain;
 
     public string? GetDetectedIp() => _ip;
@@ -42,11 +49,11 @@ public class SrunPortal
 
     public async Task DetectInfoAsync()
     {
-        Console.WriteLine($"[诊断] 开始探测 IP/AC_ID...");
+        LogDebug($"[诊断] 开始探测 IP/AC_ID...");
 
         if (!string.IsNullOrEmpty(_acId) && !string.IsNullOrEmpty(_ip))
         {
-            Console.WriteLine($"[诊断] 已提供 IP={_ip}, AC_ID={_acId}");
+            LogDebug($"[诊断] 已提供 IP={_ip}, AC_ID={_acId}");
             return;
         }
 
@@ -54,7 +61,7 @@ public class SrunPortal
         try
         {
             var (html, finalUrl) = await FetchHtmlAsync("/");
-            Console.WriteLine($"[诊断] 首页最终 URL: {finalUrl}");
+            LogDebug($"[诊断] 首页最终 URL: {finalUrl}");
 
             var acIdFromHtml = ExtractAcId(html);
             if (!string.IsNullOrEmpty(acIdFromHtml))
@@ -66,13 +73,13 @@ public class SrunPortal
                 if (!string.IsNullOrEmpty(ipFromHtml))
                 {
                     _ip = ipFromHtml;
-                    Console.WriteLine($"[诊断] 从首页 HTML 提取 IP: {_ip}");
+                    LogDebug($"[诊断] 从首页 HTML 提取 IP: {_ip}");
                 }
             }
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[诊断] 首页探测失败: {e.Message}");
+            LogDebug($"[诊断] 首页探测失败: {e.Message}");
         }
 
         // 2. ac_detect 接口
@@ -80,9 +87,9 @@ public class SrunPortal
         {
             try
             {
-                Console.WriteLine("[诊断] 尝试 ac_detect 接口获取真实 ac_id...");
+                LogDebug("[诊断] 尝试 ac_detect 接口获取真实 ac_id...");
                 var data = await GetJsonAsync("/v1/srun_portal_detect");
-                Console.WriteLine($"[诊断] ac_detect 返回: {JsonSerializer.Serialize(data)}");
+                LogDebug($"[诊断] ac_detect 返回: {JsonSerializer.Serialize(data)}");
 
                 string? redirect = null, pcUrl = null, mobileUrl = null;
 
@@ -97,19 +104,19 @@ public class SrunPortal
                     if (match.Success)
                     {
                         _acId = match.Groups[1].Value;
-                        Console.WriteLine($"[诊断] 从 ac_detect 重定向 URL 获取 ac_id: {_acId}");
+                        LogDebug($"[诊断] 从 ac_detect 重定向 URL 获取 ac_id: {_acId}");
                     }
                 }
 
                 if ((string.IsNullOrEmpty(_acId) || _acId == "1") && data.TryGetProperty("ac_id", out var acid) && acid.ValueKind == JsonValueKind.Number)
                 {
                     _acId = acid.GetInt32().ToString();
-                    Console.WriteLine($"[诊断] 从 ac_detect 数据获取 ac_id: {_acId}");
+                    LogDebug($"[诊断] 从 ac_detect 数据获取 ac_id: {_acId}");
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[诊断] ac_detect 失败: {e.Message}");
+                LogDebug($"[诊断] ac_detect 失败: {e.Message}");
             }
         }
 
@@ -118,15 +125,15 @@ public class SrunPortal
         {
             try
             {
-                Console.WriteLine("[诊断] 尝试访问 srun_portal_pc 获取真实 ac_id...");
+                LogDebug("[诊断] 尝试访问 srun_portal_pc 获取真实 ac_id...");
                 var (html, finalUrl) = await FetchHtmlAsync("/srun_portal_pc");
-                Console.WriteLine($"[诊断] srun_portal_pc 最终 URL: {finalUrl}");
+                LogDebug($"[诊断] srun_portal_pc 最终 URL: {finalUrl}");
 
                 var match = Regex.Match(finalUrl, @"[?&]ac_id=(\d+)");
                 if (match.Success)
                 {
                     _acId = match.Groups[1].Value;
-                    Console.WriteLine($"[诊断] 从 srun_portal_pc URL 提取 ac_id: {_acId}");
+                    LogDebug($"[诊断] 从 srun_portal_pc URL 提取 ac_id: {_acId}");
                 }
 
                 var acIdFromHtml = ExtractAcId(html);
@@ -139,20 +146,20 @@ public class SrunPortal
                     if (!string.IsNullOrEmpty(ipFromHtml))
                     {
                         _ip = ipFromHtml;
-                        Console.WriteLine($"[诊断] 从 srun_portal_pc HTML 提取 IP: {_ip}");
+                        LogDebug($"[诊断] 从 srun_portal_pc HTML 提取 IP: {_ip}");
                     }
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[诊断] srun_portal_pc 探测失败: {e.Message}");
+                LogDebug($"[诊断] srun_portal_pc 探测失败: {e.Message}");
             }
         }
 
         // 4. 尝试候选 ac_id
         if (string.IsNullOrEmpty(_acId) || _acId == "1")
         {
-            Console.WriteLine($"[诊断] 尝试候选 ac_id 列表: {string.Join(", ", _acIdCandidates)}");
+            LogDebug($"[诊断] 尝试候选 ac_id 列表: {string.Join(", ", _acIdCandidates)}");
             foreach (var testAcId in _acIdCandidates)
             {
                 try
@@ -164,14 +171,14 @@ public class SrunPortal
 
                     if (data.Error == "ok" && !string.IsNullOrEmpty(data.Challenge))
                     {
-                        Console.WriteLine($"[诊断] ac_id={testAcId} 的 get_challenge 成功");
+                        LogDebug($"[诊断] ac_id={testAcId} 的 get_challenge 成功");
                         _acId = testAcId;
                         break;
                     }
                 }
                 catch
                 {
-                    Console.WriteLine($"[诊断] ac_id={testAcId} 测试失败");
+                    LogDebug($"[诊断] ac_id={testAcId} 测试失败");
                 }
             }
         }
@@ -181,18 +188,18 @@ public class SrunPortal
         {
             try
             {
-                Console.WriteLine("[诊断] 尝试 JSONP 模式 rad_user_info 获取 IP...");
+                LogDebug("[诊断] 尝试 JSONP 模式 rad_user_info 获取 IP...");
                 var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true);
                 if (data.TryGetProperty("client_ip", out var clientIp) && clientIp.ValueKind == JsonValueKind.String)
                     _ip = clientIp.GetString();
                 if (string.IsNullOrEmpty(_ip) && data.TryGetProperty("online_ip", out var onlineIp) && onlineIp.ValueKind == JsonValueKind.String)
                     _ip = onlineIp.GetString();
                 if (!string.IsNullOrEmpty(_ip))
-                    Console.WriteLine($"[诊断] 从 JSONP rad_user_info 获取 IP: {_ip}");
+                    LogDebug($"[诊断] 从 JSONP rad_user_info 获取 IP: {_ip}");
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[诊断] JSONP rad_user_info 失败: {e.Message}");
+                LogDebug($"[诊断] JSONP rad_user_info 失败: {e.Message}");
             }
         }
 
@@ -202,11 +209,11 @@ public class SrunPortal
 
         if (string.IsNullOrEmpty(_acId))
         {
-            Console.WriteLine("[警告] 无法自动获取 ac_id，使用默认值 1");
+            LogDebug("[警告] 无法自动获取 ac_id，使用默认值 1");
             _acId = "1";
         }
 
-        Console.WriteLine($"[诊断] 探测结果: IP={_ip}, AC_ID={_acId}");
+        LogDebug($"[诊断] 探测结果: IP={_ip}, AC_ID={_acId}");
     }
 
     private async Task<(string Html, string FinalUrl)> FetchHtmlAsync(string path)
@@ -320,11 +327,11 @@ public class SrunPortal
 
     public async Task<LoginResult> LoginAsync()
     {
-        Console.WriteLine($"[登录] 账号: {_username}, IP: {_ip}, AC_ID: {_acId}");
+        LogDebug($"[登录] 账号: {_username}, IP: {_ip}, AC_ID: {_acId}");
 
         var challenge = await GetChallengeAsync();
         var token = challenge.Challenge ?? "";
-        Console.WriteLine($"[登录] 获取 token: {(token.Length > 8 ? token[..8] : token)}...");
+        LogDebug($"[登录] 获取 token: {(token.Length > 8 ? token[..8] : token)}...");
 
         var queryParams = new Dictionary<string, string>
         {
@@ -371,7 +378,7 @@ public class SrunPortal
         }
         else
         {
-            Console.WriteLine("[登录] 使用老版本明文密码模式");
+            LogDebug("[登录] 使用老版本明文密码模式");
             queryParams["password"] = _password;
         }
 
@@ -440,7 +447,7 @@ public class SrunPortal
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[诊断] 获取到期时间失败: {e.Message}");
+            LogDebug($"[诊断] 获取到期时间失败: {e.Message}");
         }
         return null;
     }

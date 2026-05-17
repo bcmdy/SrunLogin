@@ -69,6 +69,15 @@ public partial class MainForm : Form
         }
     }
 
+    private string LogPath
+    {
+        get
+        {
+            var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(exeDir, "app.log");
+        }
+    }
+
     public MainForm()
     {
         this.AutoScaleMode = AutoScaleMode.None;
@@ -489,22 +498,23 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             SaveConfig();
 
         SetButtonsEnabled(false);
-        AppendOutput("=== 登录尝试 ===\n");
+        Log("=== 登录尝试 ===");
 
         try
         {
             var portal = new SrunPortal(url, username, password, acId, ip, domain);
+            portal.DebugLog = LogDebug;
             await portal.DetectInfoAsync();
 
             var ipResult = portal.GetDetectedIp();
             var acIdResult = portal.GetDetectedAcId();
-            AppendOutput($"检测结果 - IP: {ipResult}, AC_ID: {acIdResult}\n");
+            Log($"检测结果 - IP: {ipResult}, AC_ID: {acIdResult}");
 
             _lastIp = ipResult;
             _lastAcId = acIdResult;
 
             var result = await portal.LoginAsync();
-            AppendOutput($"结果: {result.Error}\n");
+            Log($"结果: {result.Error}");
 
             if (result.IsSuccess)
             {
@@ -515,13 +525,13 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             {
                 var error = result.ErrorMsg ?? result.Message ?? result.Ecode ?? "未知错误";
                 MessageBox.Show($"登录失败：{error}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                AppendOutput($"错误：{error}\n");
+                Log($"错误：{error}");
             }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"错误：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            AppendOutput($"异常：{ex.Message}\n");
+            Log($"异常：{ex.Message}");
         }
         finally
         {
@@ -544,17 +554,18 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         var domain = GetActualText(_txtDomain, "");
 
         SetButtonsEnabled(false);
-        AppendOutput("=== 查询状态 ===\n");
+        Log("=== 查询状态 ===");
 
         try
         {
             var portal = new SrunPortal(url, username, "", acId, ip, domain);
+            portal.DebugLog = LogDebug;
             await portal.DetectInfoAsync();
             await QueryStatus(portal);
         }
         catch (Exception ex)
         {
-            AppendOutput($"错误：{ex.Message}\n");
+            Log($"错误：{ex.Message}");
         }
         finally
         {
@@ -577,29 +588,30 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         var domain = GetActualText(_txtDomain, "");
 
         SetButtonsEnabled(false);
-        AppendOutput("=== 登出 ===\n");
+        Log("=== 登出 ===");
 
         try
         {
             var portal = new SrunPortal(url, username, "", acId, ip, domain);
+            portal.DebugLog = LogDebug;
             await portal.DetectInfoAsync();
             var result = await portal.LogoutAsync();
 
             if (result.IsSuccess)
             {
                 MessageBox.Show("登出成功！", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                AppendOutput("登出成功\n");
+                Log("登出成功");
             }
             else
             {
                 var error = result.ErrorMsg ?? result.Message ?? "未知错误";
                 MessageBox.Show($"登出失败：{error}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                AppendOutput($"错误：{error}\n");
+                Log($"错误：{error}");
             }
         }
         catch (Exception ex)
         {
-            AppendOutput($"错误：{ex.Message}\n");
+            Log($"错误：{ex.Message}");
         }
         finally
         {
@@ -612,17 +624,17 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         try
         {
             var info = await portal.GetUserInfoAsync();
-            AppendOutput("\n--- 用户信息 ---\n");
-            AppendOutput($"账号：{info.UserName ?? "N/A"}\n");
-            AppendOutput($"IP：{info.OnlineIp ?? info.ClientIp ?? "N/A"}\n");
-            AppendOutput($"MAC：{info.UserMac ?? "N/A"}\n");
+            Log("\n--- 用户信息 ---");
+            Log($"账号：{info.UserName ?? "N/A"}");
+            Log($"IP：{info.OnlineIp ?? info.ClientIp ?? "N/A"}");
+            Log($"MAC：{info.UserMac ?? "N/A"}");
 
             if (info.SumBytes > 0)
-                AppendOutput($"已用流量：{FormatFlow(info.SumBytes.Value)}\n");
+                Log($"已用流量：{FormatFlow(info.SumBytes.Value)}");
             if (info.SumSeconds > 0)
-                AppendOutput($"已用时长：{FormatTime(info.SumSeconds.Value)}\n");
+                Log($"已用时长：{FormatTime(info.SumSeconds.Value)}");
             if (info.UserBalance.HasValue)
-                AppendOutput($"余额：{info.UserBalance:F2}\n");
+                Log($"余额：{info.UserBalance:F2}");
         }
         catch { }
 
@@ -630,11 +642,11 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         {
             var expire = await portal.GetExpireTimeAsync();
             if (expire.HasValue)
-                AppendOutput($"到期时间：{expire:yyyy-MM-dd HH:mm:ss}\n");
+                Log($"到期时间：{expire:yyyy-MM-dd HH:mm:ss}");
         }
         catch { }
 
-        AppendOutput("\n");
+        Log("");
     }
 
     private void SetButtonsEnabled(bool enabled)
@@ -647,6 +659,37 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
     private void AppendOutput(string text)
     {
         _txtOutput.AppendText(text);
+    }
+
+    private enum LogLevel { Info, Debug }
+
+    private void Log(string text, LogLevel level = LogLevel.Info)
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var logLine = $"[{timestamp}] {text}\n";
+
+        try
+        {
+            File.AppendAllText(LogPath, logLine);
+        }
+        catch { }
+
+        if (level == LogLevel.Info)
+        {
+            AppendOutput(text + "\n");
+        }
+    }
+
+    private void LogDebug(string text)
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var logLine = $"[{timestamp}] {text}\n";
+
+        try
+        {
+            File.AppendAllText(LogPath, logLine);
+        }
+        catch { }
     }
 
     private static string FormatFlow(long bytes)
