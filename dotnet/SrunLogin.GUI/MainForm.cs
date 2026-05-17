@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using SrunLogin.Crypto;
 using SrunLogin.Models;
@@ -8,6 +9,31 @@ namespace SrunLogin.GUI;
 
 public partial class MainForm : Form
 {
+    [DllImport("user32.dll")]
+    private static extern int ShowScrollBar(IntPtr hWnd, int wBar, int bShow);
+
+    private const int SB_VERT = 1;
+    private const int SB_HORZ = 0;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetScrollInfo(IntPtr hWnd, int fnBar, ref SCROLLINFO lpsi, bool fRedraw);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SCROLLINFO
+    {
+        public int cbSize;
+        public int fMask;
+        public int nMin;
+        public int nMax;
+        public int nPage;
+        public int nPos;
+        public int nTrackPos;
+    }
+
+    private const int SIF_RANGE = 0x0001;
+    private const int SIF_PAGE = 0x0002;
+    private const int SIF_DISABLENOSCROLL = 0x0003;
+
     private TextBox _txtUrl = null!;
     private TextBox _txtUsername = null!;
     private TextBox _txtPassword = null!;
@@ -17,10 +43,9 @@ public partial class MainForm : Form
     private Button _btnLogin = null!;
     private Button _btnLogout = null!;
     private Button _btnInfo = null!;
-    private TextBox _txtOutput = null!;
+    private RichTextBox _txtOutput = null!;
     private CheckBox _chkSaveConfig = null!;
 
-    private TextBox _hiddenFocus = null!;
     private CheckBox _chkShowPassword = null!;
 
     private string? _lastAcId;
@@ -44,13 +69,13 @@ public partial class MainForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        _hiddenFocus.Focus();
+        ActiveControl = null;
     }
 
     private void InitializeComponent()
     {
         Text = "校园网认证工具";
-        Size = new Size(550, 550);
+        Size = new Size(550, 650);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -105,7 +130,7 @@ public partial class MainForm : Form
         _chkSaveConfig = new CheckBox
         {
             Text = "保存配置",
-            Location = new Point(20, 248),
+            Location = new Point(420, 208),
             Size = new Size(90, 20),
             FlatStyle = FlatStyle.Flat,
             Checked = true
@@ -118,23 +143,12 @@ public partial class MainForm : Form
                 DeleteConfig();
         };
 
-        // 填写说明按钮
-        var btnHelp = new Button
-        {
-            Text = "?",
-            Location = new Point(470, 58),
-            Size = new Size(25, 22),
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
-        btnHelp.Click += (s, e) => ShowHelp();
-
         // 按钮
         _btnLogin = new Button
         {
             Text = "登录",
-            Location = new Point(115, 240),
-            Size = new Size(85, 32),
+            Location = new Point(20, 245),
+            Size = new Size(75, 32),
             BackColor = Color.FromArgb(0, 120, 215),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -145,8 +159,8 @@ public partial class MainForm : Form
         _btnInfo = new Button
         {
             Text = "查询状态",
-            Location = new Point(210, 240),
-            Size = new Size(95, 32),
+            Location = new Point(105, 245),
+            Size = new Size(85, 32),
             BackColor = Color.FromArgb(0, 150, 136),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -157,8 +171,8 @@ public partial class MainForm : Form
         _btnLogout = new Button
         {
             Text = "登出",
-            Location = new Point(315, 240),
-            Size = new Size(85, 32),
+            Location = new Point(200, 245),
+            Size = new Size(65, 32),
             BackColor = Color.FromArgb(244, 67, 54),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -166,36 +180,43 @@ public partial class MainForm : Form
         };
         _btnLogout.Click += BtnLogout_Click;
 
-        // 输出
-        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 290), Size = new Size(100, 20) };
-        _txtOutput = new TextBox
+        var btnHelp = new Button
         {
-            Location = new Point(20, 310),
-            Size = new Size(500, 145),
+            Text = "填写帮助",
+            Location = new Point(275, 245),
+            Size = new Size(80, 32),
+            BackColor = Color.Yellow,
+            ForeColor = Color.Black,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        btnHelp.Click += (s, e) => ShowHelp();
+
+        // 输出
+        var lblOutput = new Label { Text = "输出:", Location = new Point(20, 285), Size = new Size(100, 20) };
+        _txtOutput = new RichTextBox
+        {
+            Location = new Point(20, 305),
+            Size = new Size(500, 280),
             Multiline = true,
             ReadOnly = true,
-            ScrollBars = ScrollBars.Vertical,
+            ScrollBars = RichTextBoxScrollBars.Both,
             BackColor = Color.White,
-            Font = new Font("Consolas", 9)
+            Font = new Font("Consolas", 9),
+            AcceptsTab = true
         };
+        // 强制显示垂直滚动条
+        var si = new SCROLLINFO { cbSize = Marshal.SizeOf<SCROLLINFO>(), fMask = SIF_DISABLENOSCROLL, nMin = 0, nMax = 100, nPage = 100 };
+        SetScrollInfo(_txtOutput.Handle, SB_VERT, ref si, true);
+        ShowScrollBar(_txtOutput.Handle, SB_VERT, 1);
 
         Controls.AddRange(new Control[]
         {
-            lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, lblPwd, _txtPassword,
-            _chkShowPassword, lblIp, _txtIp, lblAcId, _txtAcId,
+            lblTitle, lblUrl, _txtUrl, lblUser, _txtUsername, _txtPassword, _chkShowPassword, lblIp, _txtIp, lblAcId, _txtAcId,
             lblDomain, _txtDomain, _chkSaveConfig,
-            _btnLogin, _btnInfo, _btnLogout, lblOutput, _txtOutput
+            _btnLogin, _btnInfo, _btnLogout, btnHelp, lblOutput, _txtOutput
         });
 
-        // 创建隐藏文本框用于默认焦点，避免文本框获得焦点导致占位符消失
-        _hiddenFocus = new TextBox
-        {
-            Location = new Point(-100, -100),
-            Size = new Size(1, 1),
-            TabStop = false,
-            Visible = false
-        };
-        Controls.Add(_hiddenFocus);
     }
 
     private void LoadConfig()
@@ -284,57 +305,22 @@ public partial class MainForm : Form
 
     private void ShowHelp()
     {
-        var helpText = @"填写说明
-==============
+        var helpText = @"========== 填写说明 ==========
+网关地址：校园网认证服务器URL，通常是 http://10.0.0.1 或 http://192.168.0.1，可在浏览器打开任意网页自动跳转获取
+用户名：校园网账号，通常是学号或工号
+密码：校园网密码
+IP地址：本机在校园网中的IP，留空自动获取
+AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指定
+域：部分校园网支持多域认证，如 @edu.cn、@student、@teacher
 
-网关地址
-  校园网认证服务器的 URL
-  通常是 http://10.0.0.1 或 http://192.168.0.1
-  可在浏览器打开任意网页自动跳转获取
-
-用户名
-  校园网账号，通常是学号或工号
-
-密码
-  校园网密码
-
-IP地址
-  本机在校园网中的 IP 地址
-  留空自动获取，也可手动指定
-
-AC ID
-  认证设备编号
-  留空自动获取，如果登录失败可尝试手动指定
-
-域
-  部分校园网支持多域认证
-  示例：
-    留空    - 普通账号
-    @edu.cn  - 教育网用户
-    @student - 学生账号
-    @teacher - 教师账号
-
-保存配置
-  勾选后会将配置保存到本地
-  下次打开自动填入
-
-常见问题
-  -----------
-  1. 无法获取 IP
-     → 手动填写 IP 地址
-
-  2. ac_id 错误
-     → 尝试手动指定 AC ID
-
-  3. 当前已在线
-     → 账号已登录成功，无需重复登录
-
-  4. 认证信息加密错误
-     → AC ID 不正确，尝试更换
-
-  5. 在线设备数量超限
-     → 先登出其他设备";
-        MessageBox.Show(helpText, "填写说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
+========== 常见问题 ==========
+1. 无法获取IP → 手动填写IP地址
+2. ac_id错误 → 尝试手动指定AC ID
+3. 当前已在线 → 账号已登录成功，无需重复登录
+4. 认证加密错误 → AC ID不正确，尝试更换
+5. 在线设备超限 → 先登出其他设备
+";
+        _txtOutput.Text = helpText;
     }
 
     private static TextBox CreatePlaceholderTextBox(int x, int y, int width, int height, string placeholder)
