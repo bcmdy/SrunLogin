@@ -5,6 +5,7 @@ using System.Text.Json;
 using SrunLogin.Crypto;
 using SrunLogin.Models;
 using SrunLogin.Services;
+using System.Reflection;
 
 namespace SrunLogin.GUI;
 
@@ -71,6 +72,11 @@ public partial class MainForm : Form
     private bool _isLoopRunning = false;
     private int _lastCheckTime = 0;
 
+    // ===== 托盘图标相关 =====
+    private NotifyIcon _notifyIcon = null!;
+    private ContextMenuStrip _trayMenu = null!;
+    private bool _allowClose = false;
+
     private string ConfigPath
     {
         get
@@ -89,10 +95,41 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// 从程序集嵌入资源加载图标
+    /// </summary>
+    private static Icon? LoadEmbeddedIcon()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+
+        // 尝试查找常见的资源名称格式
+        var resourceNames = assembly.GetManifestResourceNames();
+
+        // 优先查找 .ico 结尾的资源
+        var iconResource = resourceNames.FirstOrDefault(n =>
+            n.EndsWith(".ico", StringComparison.OrdinalIgnoreCase));
+
+        if (iconResource == null)
+            return null;
+
+        try
+        {
+            using var stream = assembly.GetManifestResourceStream(iconResource);
+            if (stream == null)
+                return null;
+            return new Icon(stream);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public MainForm()
     {
         this.AutoScaleMode = AutoScaleMode.None;
         InitializeComponent();
+        InitializeTrayIcon();
         LoadConfig();
     }
 
@@ -115,6 +152,119 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// 初始化托盘图标和右键菜单
+    /// </summary>
+    private void InitializeTrayIcon()
+    {
+        _trayMenu = new ContextMenuStrip();
+
+        // 打开界面
+        var menuShow = new ToolStripMenuItem("打开界面", null, (s, e) => ShowFromTray());
+        // 登录
+        var menuLogin = new ToolStripMenuItem("登录", null, (s, e) => TrayLogin());
+        // 登出
+        var menuLogout = new ToolStripMenuItem("登出", null, (s, e) => TrayLogout());
+        // 分隔线
+        var separator = new ToolStripSeparator();
+        // 退出
+        var menuExit = new ToolStripMenuItem("退出", null, (s, e) => { _allowClose = true; Application.Exit(); });
+
+        _trayMenu.Items.AddRange(new ToolStripItem[]
+        {
+            menuShow,
+            menuLogin,
+            menuLogout,
+            separator,
+            menuExit
+        });
+
+        _notifyIcon = new NotifyIcon
+        {
+            Text = "校园网认证工具",
+            Visible = true,
+            ContextMenuStrip = _trayMenu
+        };
+
+        // 加载嵌入资源图标
+        _notifyIcon.Icon = LoadEmbeddedIcon() ?? SystemIcons.Application;
+
+        // 双击打开
+        _notifyIcon.DoubleClick += (s, e) => ShowFromTray();
+    }
+
+    /// <summary>
+    /// 从托盘恢复窗口
+    /// </summary>
+    private void ShowFromTray()
+    {
+        Show();
+        WindowState = FormWindowState.Normal;
+        Activate();
+    }
+
+    /// <summary>
+    /// 托盘菜单执行登录
+    /// </summary>
+    private void TrayLogin()
+    {
+        if (InvokeRequired)
+        {
+            Invoke(TrayLogin);
+            return;
+        }
+
+        ShowFromTray();
+        BtnLogin_Click(null, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 托盘菜单执行登出
+    /// </summary>
+    private void TrayLogout()
+    {
+        if (InvokeRequired)
+        {
+            Invoke(TrayLogout);
+            return;
+        }
+
+        ShowFromTray();
+        BtnLogout_Click(null, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 最小化时隐藏到托盘
+    /// </summary>
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+
+        if (WindowState == FormWindowState.Minimized)
+        {
+            Hide();
+            _notifyIcon.ShowBalloonTip(2000, "校园网认证工具", "已最小化到托盘", ToolTipIcon.Info);
+        }
+    }
+
+    /// <summary>
+    /// 关闭时最小化到托盘而非退出（除非从托盘菜单选择退出）
+    /// </summary>
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!_allowClose && e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+            WindowState = FormWindowState.Minimized;
+            Hide();
+            _notifyIcon.ShowBalloonTip(2000, "校园网认证工具", "程序已最小化到托盘，右键图标可操作", ToolTipIcon.Info);
+            return;
+        }
+
+        _notifyIcon?.Dispose();
+        base.OnFormClosing(e);
+    }
+
     private void InitializeComponent()
     {
         Text = "校园网认证工具";
@@ -124,6 +274,9 @@ public partial class MainForm : Form
         MaximizeBox = false;
         BackColor = ColorBg;
         Font = new Font("Segoe UI", 9F);
+
+        // ===== 新增：设置窗口图标 =====
+        Icon = LoadEmbeddedIcon() ?? SystemIcons.Application;
 
         int marginX = 35;
         int startY = 20;
@@ -770,6 +923,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
             if (result.IsSuccess)
             {
+                // 登录成功仅输出日志，不弹窗
                 Log("[登录] 登录成功");
                 await QueryStatus(portal);
             }

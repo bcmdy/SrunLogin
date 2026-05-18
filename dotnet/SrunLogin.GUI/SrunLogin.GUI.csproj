@@ -6,10 +6,12 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SrunLogin.Core\SrunLogin.Core.csproj" />
+    <EmbeddedResource Include="Resources\icon.ico" />
   </ItemGroup>
 
 </Project>
