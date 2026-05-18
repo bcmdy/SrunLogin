@@ -30,25 +30,21 @@ public static class SrunBase64
             int idx = StdAlpha.IndexOf(c);
             result.Append(idx >= 0 ? CustomAlpha[idx] : c);
         }
-        return result.ToString().TrimEnd('=');
+        return result.ToString();
     }
 
     public static byte[] Decode(string encoded)
     {
         var stdEncoded = new StringBuilder();
-        int padding = 0;
 
         foreach (var c in encoded)
         {
-            if (c == '=')
-            {
-                padding++;
-                continue;
-            }
+            if (c == '=') continue;
             stdEncoded.Append(CustomReverse.TryGetValue(c, out int idx) ? StdAlpha[idx] : c);
         }
 
-        while (padding > 0)
+        // 补足 Base64 填充
+        while (stdEncoded.Length % 4 != 0)
             stdEncoded.Append('=');
 
         return Convert.FromBase64String(stdEncoded.ToString());

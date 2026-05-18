@@ -3,14 +3,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Web;
 using SrunLogin.Crypto;
 using SrunLogin.Models;
 
 namespace SrunLogin.Services;
 
 /// <summary>
-/// Srun 门户认证服务
+/// Srun 门户认证服务（参数顺序严格保持与 Python 原版一致）
 /// </summary>
 public class SrunPortal
 {
@@ -21,6 +20,7 @@ public class SrunPortal
     private string? _acId;
     private string? _ip;
     private readonly CookieContainer _cookieContainer = new();
+    private readonly HttpClient _httpClient;
 
     private static readonly Random Random = new();
     private readonly string[] _acIdCandidates = ["143", "2", "3", "5", "10", "15", "20", "100"];
@@ -35,6 +35,14 @@ public class SrunPortal
         _domain = domain;
         _acId = acId;
         _ip = ip;
+
+        // 共享 HttpClient 和 CookieContainer，保持会话一致性
+        var handler = new HttpClientHandler { CookieContainer = _cookieContainer };
+        _httpClient = new HttpClient(handler);
+        _httpClient.Timeout = TimeSpan.FromSeconds(15);
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", GetUserAgent());
+        _httpClient.DefaultRequestHeaders.Add("Accept", GetAccept());
+        _httpClient.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
     }
 
     private void LogDebug(string message)
@@ -93,9 +101,9 @@ public class SrunPortal
 
                 string? redirect = null, pcUrl = null, mobileUrl = null;
 
-                if (data.TryGetProperty("Redirect", out var r)) redirect = r.GetString();
-                if (data.TryGetProperty("Pc", out var p)) pcUrl = p.GetString();
-                if (data.TryGetProperty("Mobile", out var m)) mobileUrl = m.GetString();
+                if (data.TryGetProperty("Redirect", out var r) && r.ValueKind == JsonValueKind.String) redirect = r.GetString();
+                if (data.TryGetProperty("Pc", out var p) && p.ValueKind == JsonValueKind.String) pcUrl = p.GetString();
+                if (data.TryGetProperty("Mobile", out var m) && m.ValueKind == JsonValueKind.String) mobileUrl = m.GetString();
 
                 var targetUrl = redirect ?? pcUrl ?? mobileUrl;
                 if (!string.IsNullOrEmpty(targetUrl))
@@ -218,42 +226,63 @@ public class SrunPortal
 
     private async Task<(string Html, string FinalUrl)> FetchHtmlAsync(string path)
     {
-        var handler = new HttpClientHandler { CookieContainer = _cookieContainer };
-        using var client = new HttpClient(handler);
-        client.Timeout = TimeSpan.FromSeconds(10);
-        client.DefaultRequestHeaders.Add("User-Agent", GetUserAgent());
-        client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        var request = new HttpRequestMessage(HttpMethod.Get, _authUrl + path);
+        request.Headers.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
 
-        var response = await client.GetAsync(_authUrl + path);
+        var response = await _httpClient.SendAsync(request);
         var html = await response.Content.ReadAsStringAsync();
         return (html, response.RequestMessage?.RequestUri?.ToString() ?? _authUrl + path);
     }
 
-    private async Task<JsonElement> GetJsonAsync(string path, bool jsonp = false)
+    /// <summary>
+    /// 核心修复：使用有序参数列表，确保参数顺序与 Python urllib.parse.urlencode 完全一致
+    /// </summary>
+    private static string BuildQueryString(IEnumerable<KeyValuePair<string, string>> parameters)
     {
-        var query = new Dictionary<string, string>();
+        var sb = new StringBuilder();
+        foreach (var kv in parameters)
+        {
+            if (sb.Length > 0) sb.Append('&');
+            sb.Append(Uri.EscapeDataString(kv.Key));
+            sb.Append('=');
+            sb.Append(Uri.EscapeDataString(kv.Value));
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// 统一 GET 请求方法。使用 List<KeyValuePair> 保持参数顺序。
+    /// </summary>
+    private async Task<JsonElement> GetJsonAsync(string path, List<KeyValuePair<string, string>>? parameters = null, bool jsonp = false)
+    {
+        var orderedParams = new List<KeyValuePair<string, string>>();
+        if (parameters != null)
+            orderedParams.AddRange(parameters);
+
         if (jsonp)
         {
-            query["callback"] = $"jQuery{Random.Next(100000000, 999999999)}_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
-            query["_"] = DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString();
+            var callback = $"jQuery{Random.Next(100000000, 999999999)}_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
+            orderedParams.Add(new KeyValuePair<string, string>("callback", callback));
+            orderedParams.Add(new KeyValuePair<string, string>("_", DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString()));
         }
 
         var url = _authUrl + path;
-        if (query.Count > 0)
-            url += "?" + string.Join("&", query.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
+        if (orderedParams.Count > 0)
+            url += "?" + BuildQueryString(orderedParams);
 
-        var handler = new HttpClientHandler { CookieContainer = _cookieContainer };
-        using var client = new HttpClient(handler);
-        client.Timeout = TimeSpan.FromSeconds(15);
-        client.DefaultRequestHeaders.Add("User-Agent", GetUserAgent());
-        client.DefaultRequestHeaders.Add("Accept", GetAccept());
-        client.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
-        client.DefaultRequestHeaders.Add("Referer", $"{_authUrl}/srun_portal_pc?ac_id={_acId}&theme=pro");
+        LogDebug($"[诊断] 请求: {url[..Math.Min(130, url.Length)]}...");
 
-        var response = await client.GetAsync(url);
-        var text = await response.Content.ReadAsStringAsync();
+        // 更新 Referer（先移除再添加，避免重复）
+        _httpClient.DefaultRequestHeaders.Remove("Referer");
+        _httpClient.DefaultRequestHeaders.Add("Referer", $"{_authUrl}/srun_portal_pc?ac_id={_acId}&theme=pro");
+
+        var text = await _httpClient.GetStringAsync(url);
+        LogDebug($"[诊断] 响应: {text[..Math.Min(200, text.Length)]}");
         return ParseResponse(text);
     }
+
+    private static string? SafeGetString(JsonElement element) =>
+        element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString();
 
     private JsonElement ParseResponse(string text)
     {
@@ -270,61 +299,75 @@ public class SrunPortal
         if (text == "login_error")
             return JsonDocument.Parse("{\"error\":\"login_error\"}").RootElement;
 
+        if (text == "bad_request_parameters")
+            return JsonDocument.Parse("{\"error\":\"bad_request_parameters\"}").RootElement;
+
         if (text.StartsWith("challenge="))
         {
-            var challenge = text.Split('=', 1)[1];
+            // 修复：Split('=', 1) 在 C# 中只会返回 1 个元素，必须用 2
+            var challenge = text.Split('=', 2)[1];
             return JsonDocument.Parse($"{{\"error\":\"ok\",\"challenge\":\"{challenge}\"}}").RootElement;
         }
 
-        // JSONP
-        var jsonpMatch = Regex.Match(text, @"jQuery\d+_\d+\((\{.*\})\)\s*;?\s*$", RegexOptions.Singleline);
-        if (jsonpMatch.Success)
-            text = jsonpMatch.Groups[1].Value;
-
+        // 尝试直接 JSON 解析
         try
         {
             return JsonDocument.Parse(text).RootElement;
         }
-        catch
-        {
-            // CSV 格式
-            if (text.Contains(',') && !text.StartsWith('<'))
-            {
-                var parts = text.Split(',');
-                return JsonDocument.Parse(JsonSerializer.Serialize(new
-                {
-                    error = "ok",
-                    user_name = parts.Length > 0 ? parts[0].Trim() : null,
-                    online_ip = parts.Length > 8 ? parts[8].Trim() : null,
-                    sum_bytes = parts.Length > 6 ? (long.TryParse(parts[6].Trim(), out var sb) ? sb : 0) : 0,
-                    sum_seconds = parts.Length > 4 ? (long.TryParse(parts[4].Trim(), out var ss) ? ss : 0) : 0
-                })).RootElement;
-            }
+        catch { }
 
-            throw new InvalidOperationException($"无法解析响应: {text[..Math.Min(200, text.Length)]}");
+        // JSONP: jQuery123({...});  使用通用正则匹配，与 Python 一致
+        var jsonpMatch = Regex.Match(text, @"[^(]*\((.*)\)\s*;?\s*$", RegexOptions.Singleline);
+        if (jsonpMatch.Success)
+        {
+            try
+            {
+                return JsonDocument.Parse(jsonpMatch.Groups[1].Value).RootElement;
+            }
+            catch { }
         }
+
+        // CSV 格式
+        if (text.Contains(',') && !text.StartsWith('<'))
+        {
+            var parts = text.Split(',');
+            return JsonDocument.Parse(JsonSerializer.Serialize(new
+            {
+                error = "ok",
+                user_name = parts.Length > 0 ? parts[0].Trim() : null,
+                online_ip = parts.Length > 8 ? parts[8].Trim() : null,
+                sum_bytes = parts.Length > 6 ? (long.TryParse(parts[6].Trim(), out var sb) ? sb : 0) : 0,
+                sum_seconds = parts.Length > 4 ? (long.TryParse(parts[4].Trim(), out var ss) ? ss : 0) : 0
+            })).RootElement;
+        }
+
+        throw new InvalidOperationException($"无法解析响应: {text[..Math.Min(200, text.Length)]}");
     }
 
     private async Task<ChallengeResult> GetChallengeAsync()
     {
-        var query = $"?username={HttpUtility.UrlEncode(UsernameWithDomain)}&ip={_ip}";
-        var data = await GetJsonAsync("/cgi-bin/get_challenge" + query, jsonp: true);
+        var parameters = new List<KeyValuePair<string, string>>
+        {
+            new("username", UsernameWithDomain),
+            new("ip", _ip ?? "0.0.0.0")
+        };
+
+        var data = await GetJsonAsync("/cgi-bin/get_challenge", parameters, jsonp: true);
 
         if (data.TryGetProperty("challenge", out var challenge))
-            return new ChallengeResult { Error = "ok", Challenge = challenge.GetString() };
+            return new ChallengeResult { Error = "ok", Challenge = SafeGetString(challenge) };
 
-        if (data.TryGetProperty("error", out var err) && err.GetString() == "ok")
+        if (data.TryGetProperty("error", out var err) && SafeGetString(err) == "ok")
         {
             // 尝试无 callback 模式
-            var data2 = await GetJsonAsync("/cgi-bin/get_challenge" + query, jsonp: false);
+            var data2 = await GetJsonAsync("/cgi-bin/get_challenge", parameters, jsonp: false);
             if (data2.TryGetProperty("challenge", out var challenge2))
-                return new ChallengeResult { Error = "ok", Challenge = challenge2.GetString() };
+                return new ChallengeResult { Error = "ok", Challenge = SafeGetString(challenge2) };
             return new ChallengeResult { Error = "ok", Challenge = "" };
         }
 
         throw new InvalidOperationException($"获取 challenge 失败: {data}");
     }
-
     public async Task<LoginResult> LoginAsync()
     {
         LogDebug($"[登录] 账号: {_username}, IP: {_ip}, AC_ID: {_acId}");
@@ -333,20 +376,21 @@ public class SrunPortal
         var token = challenge.Challenge ?? "";
         LogDebug($"[登录] 获取 token: {(token.Length > 8 ? token[..8] : token)}...");
 
-        var queryParams = new Dictionary<string, string>
+        // 严格按照 Python 原版的参数顺序（服务器对此极其敏感）
+        var parameters = new List<KeyValuePair<string, string>>
         {
-            ["action"] = "login",
-            ["username"] = UsernameWithDomain,
-            ["password"] = "",
-            ["os"] = "Windows 10",
-            ["name"] = "Windows",
-            ["double_stack"] = "0",
-            ["chksum"] = "",
-            ["info"] = "",
-            ["ac_id"] = _acId!,
-            ["ip"] = _ip!,
-            ["n"] = "200",
-            ["type"] = "1"
+            new("action", "login"),
+            new("username", UsernameWithDomain),
+            new("password", ""),
+            new("os", "Windows 10"),
+            new("name", "Windows"),
+            new("double_stack", "0"),
+            new("chksum", ""),
+            new("info", ""),
+            new("ac_id", _acId!),
+            new("ip", _ip!),
+            new("n", "200"),
+            new("type", "1")
         };
 
         if (!string.IsNullOrEmpty(token))
@@ -372,49 +416,19 @@ public class SrunPortal
                          token + "200" + token + "1" + token + i;
             var chksum = ComputeSha1(chkstr);
 
-            queryParams["password"] = "{MD5}" + hmd5;
-            queryParams["chksum"] = chksum;
-            queryParams["info"] = i;
+            // 按顺序替换占位值
+            parameters[2] = new KeyValuePair<string, string>("password", "{MD5}" + hmd5);
+            parameters[6] = new KeyValuePair<string, string>("chksum", chksum);
+            parameters[7] = new KeyValuePair<string, string>("info", i);
         }
         else
         {
             LogDebug("[登录] 使用老版本明文密码模式");
-            queryParams["password"] = _password;
+            parameters[2] = new KeyValuePair<string, string>("password", _password);
         }
 
-        var url = _authUrl + "/cgi-bin/srun_portal";
-        var query = string.Join("&", queryParams.Select(kv =>
-            $"callback={HttpUtility.UrlEncode("jQuery" + Random.Next(100000000, 999999999) + "_" + DateTimeOffset.Now.ToUnixTimeMilliseconds())}" +
-            $"&{kv.Key}={HttpUtility.UrlEncode(kv.Value)}" +
-            $"&_={DateTimeOffset.Now.ToUnixTimeMilliseconds()}"));
-
-        var handler = new HttpClientHandler { CookieContainer = _cookieContainer };
-        using var client = new HttpClient(handler);
-        client.Timeout = TimeSpan.FromSeconds(15);
-        client.DefaultRequestHeaders.Add("User-Agent", GetUserAgent());
-        client.DefaultRequestHeaders.Add("Accept", GetAccept());
-        client.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
-        client.DefaultRequestHeaders.Add("Referer", $"{_authUrl}/srun_portal_pc?ac_id={_acId}&theme=pro");
-
-        // JSONP 请求需要特殊处理
-        var jsonpCallback = $"jQuery{Random.Next(100000000, 999999999)}_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
-        var fullUrl = url + $"?callback={HttpUtility.UrlEncode(jsonpCallback)}&{string.Join("&", queryParams.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"))}&_={DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
-
-        var response = await client.GetAsync(fullUrl);
-        var text = await response.Content.ReadAsStringAsync();
-
-        try
-        {
-            var jsonpMatch = Regex.Match(text, @"jQuery\d+_\d+\((\{.*\})\)\s*;?\s*$", RegexOptions.Singleline);
-            if (jsonpMatch.Success)
-                text = jsonpMatch.Groups[1].Value;
-
-            return JsonSerializer.Deserialize<LoginResult>(text) ?? new LoginResult { Error = "error" };
-        }
-        catch
-        {
-            return new LoginResult { Error = "error", ErrorMsg = text };
-        }
+        var result = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true);
+        return ParseLoginResult(result);
     }
 
     public async Task<UserInfo> GetUserInfoAsync()
@@ -422,14 +436,14 @@ public class SrunPortal
         var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true);
 
         var userInfo = new UserInfo();
-        if (data.TryGetProperty("error", out var e)) userInfo.Error = e.GetString();
-        if (data.TryGetProperty("user_name", out var u)) userInfo.UserName = u.GetString();
-        if (data.TryGetProperty("online_ip", out var o)) userInfo.OnlineIp = o.GetString();
-        if (data.TryGetProperty("client_ip", out var c)) userInfo.ClientIp = c.GetString();
-        if (data.TryGetProperty("user_mac", out var m)) userInfo.UserMac = m.GetString();
-        if (data.TryGetProperty("sum_bytes", out var sb)) userInfo.SumBytes = sb.GetInt64();
-        if (data.TryGetProperty("sum_seconds", out var ss)) userInfo.SumSeconds = ss.GetInt64();
-        if (data.TryGetProperty("user_balance", out var ub)) userInfo.UserBalance = ub.GetDecimal();
+        if (data.TryGetProperty("error", out var e)) userInfo.Error = SafeGetString(e);
+        if (data.TryGetProperty("user_name", out var u)) userInfo.UserName = SafeGetString(u);
+        if (data.TryGetProperty("online_ip", out var o)) userInfo.OnlineIp = SafeGetString(o);
+        if (data.TryGetProperty("client_ip", out var c)) userInfo.ClientIp = SafeGetString(c);
+        if (data.TryGetProperty("user_mac", out var m)) userInfo.UserMac = SafeGetString(m);
+        if (data.TryGetProperty("sum_bytes", out var sb) && sb.ValueKind == JsonValueKind.Number) userInfo.SumBytes = sb.GetInt64();
+        if (data.TryGetProperty("sum_seconds", out var ss) && ss.ValueKind == JsonValueKind.Number) userInfo.SumSeconds = ss.GetInt64();
+        if (data.TryGetProperty("user_balance", out var ub) && ub.ValueKind == JsonValueKind.Number) userInfo.UserBalance = ub.GetDecimal();
 
         return userInfo;
     }
@@ -454,27 +468,48 @@ public class SrunPortal
 
     public async Task<LoginResult> LogoutAsync()
     {
-        var data = await GetJsonAsync($"/cgi-bin/srun_portal?action=logout&username={HttpUtility.UrlEncode(UsernameWithDomain)}&ip={_ip}&ac_id={_acId}", jsonp: true);
+        var parameters = new List<KeyValuePair<string, string>>
+        {
+            new("action", "logout"),
+            new("username", UsernameWithDomain),
+            new("ip", _ip!),
+            new("ac_id", _acId!)
+        };
 
+        var data = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true);
+        return ParseLoginResult(data);
+    }
+
+    private static LoginResult ParseLoginResult(JsonElement data)
+    {
         try
         {
-            return JsonSerializer.Deserialize<LoginResult>(data.GetRawText()) ?? new LoginResult { Error = "ok" };
+            return JsonSerializer.Deserialize<LoginResult>(data.GetRawText()) ?? new LoginResult { Error = "error" };
         }
         catch
         {
-            return new LoginResult { Error = data.TryGetProperty("error", out var e) ? e.GetString() : "ok" };
+            var result = new LoginResult { Error = "error" };
+            if (data.TryGetProperty("error", out var e)) result.Error = SafeGetString(e);
+            if (data.TryGetProperty("error_msg", out var em)) result.ErrorMsg = SafeGetString(em);
+            if (data.TryGetProperty("ecode", out var ec)) result.Ecode = SafeGetString(ec);
+            if (data.TryGetProperty("message", out var msg)) result.Message = SafeGetString(msg);
+            if (data.TryGetProperty("suc_msg", out var sm)) result.SucMsg = SafeGetString(sm);
+            if (data.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.Number) result.Code = c.GetInt32();
+            return result;
         }
     }
 
     private string ExtractAcId(string html)
     {
+        var candidates = new List<string>();
         var patterns = new[]
         {
-            @"<input[^>]*id=[""']ac_id[""'][^>]*value=[""'](\d+)[""']",
-            @"<input[^>]*value=[""'](\d+)[""'][^>]*id=[""']ac_id[""']",
+            @"<<input[^>]*id=[""']ac_id[""'][^>]*value=[""'](\d+)[""']",
+            @"<<input[^>]*value=[""'](\d+)[""'][^>]*id=[""']ac_id[""']",
             @"var\s+ac_id\s*=\s*['""](\d+)['""]",
             @"var\s+acid\s*=\s*['""]?(\d+)['""]?",
             @"[""']?ac_id[""']?\s*:\s*[""']?(\d+)[""']?",
+            @"[""']?acid[""']?\s*:\s*[""']?(\d+)[""']?",
             @"[?&]ac_id=(\d+)",
             @"index_(\d+)\.html",
             @"srun_portal_pc\?ac_id=(\d+)"
@@ -482,24 +517,43 @@ public class SrunPortal
 
         foreach (var pattern in patterns)
         {
-            var match = Regex.Match(html, pattern, RegexOptions.IgnoreCase);
-            if (match.Success && match.Groups[1].Value != "1")
-                return match.Groups[1].Value;
+            foreach (Match match in Regex.Matches(html, pattern, RegexOptions.IgnoreCase))
+            {
+                if (match.Success)
+                    candidates.Add(match.Groups[1].Value);
+            }
         }
-        return null!;
+
+        if (candidates.Count == 0)
+            return null!;
+
+        // 统计频率，优先选择非 "1" 的值（与 Python Counter 逻辑一致）
+        var counts = candidates.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count());
+        LogDebug($"[诊断] HTML 中发现 ac_id 候选: {JsonSerializer.Serialize(counts)}");
+
+        var nonOne = counts.Where(c => c.Key != "1").ToList();
+        if (nonOne.Count > 0)
+        {
+            var best = nonOne.OrderByDescending(c => c.Value).First().Key;
+            LogDebug($"[诊断] 选择非默认 ac_id: {best}");
+            return best;
+        }
+        return counts.OrderByDescending(c => c.Value).First().Key;
     }
 
     private string ExtractIp(string html)
     {
         var patterns = new[]
         {
-            @"<input[^>]*id=[""']ip[""'][^>]*value=[""']([\d.]+)[""']",
+            @"<<input[^>]*id=[""']ip[""'][^>]*value=[""']([\d.]+)[""']",
+            @"<<input[^>]*value=[""']([\d.]+)[""'][^>]*id=[""']ip[""']",
             @"ip\s*[:=]\s*[""']([\d.]+)[""']",
             @"userip\s*[:=]\s*[""']([\d.]+)[""']",
             @"client_ip\s*[:=]\s*[""']([\d.]+)[""']",
             @"online_ip\s*[:=]\s*[""']([\d.]+)[""']",
             @"""ip""\s*:\s*""([\d.]+)""",
             @"""client_ip""\s*:\s*""([\d.]+)""",
+            @"""online_ip""\s*:\s*""([\d.]+)""",
             @"var\s+ip\s*=\s*[""']?([\d.]+)[""']?"
         };
 

@@ -3,7 +3,7 @@ using System.Text;
 namespace SrunLogin.Crypto;
 
 /// <summary>
-/// XXTEA 加密算法实现
+/// XXTEA 加密算法实现（严格遵循 Python 原版逻辑）
 /// </summary>
 public static class XXTea
 {
@@ -32,20 +32,29 @@ public static class XXTea
         while (q > 0)
         {
             q--;
-            d += Delta;
+            d = (d + Delta) & 0xFFFFFFFF;
             uint e = (d >> 2) & 3;
 
             for (int p = 0; p < n; p++)
             {
                 y = v[p + 1];
-                uint m = ((z >> 5) ^ (y << 2)) + ((y >> 3) ^ (z << 4)) ^ (d ^ y) + (k[p & 3 ^ (int)e] ^ z);
-                v[p] += m;
+                
+                // 严格按照 Python 原版的计算顺序（分步计算，避免 C# 运算符优先级差异）
+                uint m = ((z & 0xFFFFFFFF) >> 5) ^ ((y << 2) & 0xFFFFFFFF);
+                m += (((y & 0xFFFFFFFF) >> 3) ^ ((z << 4) & 0xFFFFFFFF)) ^ (d ^ y);
+                m += (k[(p & 3) ^ (int)e] ^ z) & 0xFFFFFFFF;
+                
+                v[p] = (v[p] + m) & 0xFFFFFFFF;
                 z = v[p];
             }
 
             y = v[0];
-            uint m2 = ((z >> 5) ^ (y << 2)) + ((y >> 3) ^ (z << 4)) ^ (d ^ y) + (k[n & 3 ^ (int)e] ^ z);
-            v[n] += m2;
+            
+            uint m2 = ((z & 0xFFFFFFFF) >> 5) ^ ((y << 2) & 0xFFFFFFFF);
+            m2 += (((y & 0xFFFFFFFF) >> 3) ^ ((z << 4) & 0xFFFFFFFF)) ^ (d ^ y);
+            m2 += (k[(n & 3) ^ (int)e] ^ z) & 0xFFFFFFFF;
+            
+            v[n] = (v[n] + m2) & 0xFFFFFFFF;
             z = v[n];
         }
 

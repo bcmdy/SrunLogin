@@ -770,7 +770,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
             if (result.IsSuccess)
             {
-                MessageBox.Show("登录成功！", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Log("[登录] 登录成功");
                 await QueryStatus(portal);
             }
             else
