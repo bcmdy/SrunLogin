@@ -20,7 +20,7 @@ public class SrunPortal
     private string? _acId;
     private string? _ip;
     private readonly CookieContainer _cookieContainer = new();
-    private readonly CookieContainer _cookieContainer = new();
+    // private readonly CookieContainer _cookieContainer = new();
     private HttpClient _httpClient;
 
     private static readonly Random Random = new();
