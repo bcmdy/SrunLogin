@@ -916,7 +916,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             {
                 // 登录成功仅输出日志，不弹窗
                 Log("[登录] 登录成功");
-                await QueryStatus(portal, _cancellationTokenSource.Token);
+                await QueryStatus(portal);
             }
             else
             {
