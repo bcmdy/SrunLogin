@@ -55,7 +55,7 @@ public class SrunPortal
     public string? GetDetectedIp() => _ip;
     public string? GetDetectedAcId() => _acId;
 
-    public async Task DetectInfoAsync()
+    public async Task DetectInfoAsync(CancellationToken cancellationToken = default)
     {
         LogDebug($"[诊断] 开始探测 IP/AC_ID...");
 
@@ -68,7 +68,7 @@ public class SrunPortal
         // 1. 访问首页
         try
         {
-            var (html, finalUrl) = await FetchHtmlAsync("/");
+            var (html, finalUrl) = await FetchHtmlAsync("/", cancellationToken);
             LogDebug($"[诊断] 首页最终 URL: {finalUrl}");
 
             var acIdFromHtml = ExtractAcId(html);
@@ -85,6 +85,7 @@ public class SrunPortal
                 }
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception e)
         {
             LogDebug($"[诊断] 首页探测失败: {e.Message}");
@@ -96,7 +97,7 @@ public class SrunPortal
             try
             {
                 LogDebug("[诊断] 尝试 ac_detect 接口获取真实 ac_id...");
-                var data = await GetJsonAsync("/v1/srun_portal_detect");
+                var data = await GetJsonAsync("/v1/srun_portal_detect", cancellationToken: cancellationToken);
                 LogDebug($"[诊断] ac_detect 返回: {JsonSerializer.Serialize(data)}");
 
                 string? redirect = null, pcUrl = null, mobileUrl = null;
@@ -122,6 +123,7 @@ public class SrunPortal
                     LogDebug($"[诊断] 从 ac_detect 数据获取 ac_id: {_acId}");
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception e)
             {
                 LogDebug($"[诊断] ac_detect 失败: {e.Message}");
@@ -134,7 +136,7 @@ public class SrunPortal
             try
             {
                 LogDebug("[诊断] 尝试访问 srun_portal_pc 获取真实 ac_id...");
-                var (html, finalUrl) = await FetchHtmlAsync("/srun_portal_pc");
+                var (html, finalUrl) = await FetchHtmlAsync("/srun_portal_pc", cancellationToken);
                 LogDebug($"[诊断] srun_portal_pc 最终 URL: {finalUrl}");
 
                 var match = Regex.Match(finalUrl, @"[?&]ac_id=(\d+)");
@@ -158,6 +160,7 @@ public class SrunPortal
                     }
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception e)
             {
                 LogDebug($"[诊断] srun_portal_pc 探测失败: {e.Message}");
@@ -174,7 +177,7 @@ public class SrunPortal
                 {
                     var oldAcId = _acId;
                     _acId = testAcId;
-                    var data = await GetChallengeAsync();
+                    var data = await GetChallengeAsync(cancellationToken);
                     _acId = oldAcId;
 
                     if (data.Error == "ok" && !string.IsNullOrEmpty(data.Challenge))
@@ -184,9 +187,10 @@ public class SrunPortal
                         break;
                     }
                 }
-                catch
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e)
                 {
-                    LogDebug($"[诊断] ac_id={testAcId} 测试失败");
+                    LogDebug($"[诊断] ac_id={testAcId} 测试失败: {e.Message}");
                 }
             }
         }
@@ -197,7 +201,7 @@ public class SrunPortal
             try
             {
                 LogDebug("[诊断] 尝试 JSONP 模式 rad_user_info 获取 IP...");
-                var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true);
+                var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true, cancellationToken);
                 if (data.TryGetProperty("client_ip", out var clientIp) && clientIp.ValueKind == JsonValueKind.String)
                     _ip = clientIp.GetString();
                 if (string.IsNullOrEmpty(_ip) && data.TryGetProperty("online_ip", out var onlineIp) && onlineIp.ValueKind == JsonValueKind.String)
@@ -205,6 +209,7 @@ public class SrunPortal
                 if (!string.IsNullOrEmpty(_ip))
                     LogDebug($"[诊断] 从 JSONP rad_user_info 获取 IP: {_ip}");
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception e)
             {
                 LogDebug($"[诊断] JSONP rad_user_info 失败: {e.Message}");
@@ -224,13 +229,13 @@ public class SrunPortal
         LogDebug($"[诊断] 探测结果: IP={_ip}, AC_ID={_acId}");
     }
 
-    private async Task<(string Html, string FinalUrl)> FetchHtmlAsync(string path)
+    private async Task<(string Html, string FinalUrl)> FetchHtmlAsync(string path, CancellationToken cancellationToken = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, _authUrl + path);
         request.Headers.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
 
-        var response = await _httpClient.SendAsync(request);
-        var html = await response.Content.ReadAsStringAsync();
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
         return (html, response.RequestMessage?.RequestUri?.ToString() ?? _authUrl + path);
     }
 
@@ -253,7 +258,7 @@ public class SrunPortal
     /// <summary>
     /// 统一 GET 请求方法。使用 List<KeyValuePair> 保持参数顺序。
     /// </summary>
-    private async Task<JsonElement> GetJsonAsync(string path, List<KeyValuePair<string, string>>? parameters = null, bool jsonp = false)
+    private async Task<JsonElement> GetJsonAsync(string path, List<KeyValuePair<string, string>>? parameters = null, bool jsonp = false, CancellationToken cancellationToken = default)
     {
         var orderedParams = new List<KeyValuePair<string, string>>();
         if (parameters != null)
@@ -276,7 +281,7 @@ public class SrunPortal
         _httpClient.DefaultRequestHeaders.Remove("Referer");
         _httpClient.DefaultRequestHeaders.Add("Referer", $"{_authUrl}/srun_portal_pc?ac_id={_acId}&theme=pro");
 
-        var text = await _httpClient.GetStringAsync(url);
+        var text = await _httpClient.GetStringAsync(url, cancellationToken);
         LogDebug($"[诊断] 响应: {text[..Math.Min(200, text.Length)]}");
         return ParseResponse(text);
     }
@@ -344,7 +349,7 @@ public class SrunPortal
         throw new InvalidOperationException($"无法解析响应: {text[..Math.Min(200, text.Length)]}");
     }
 
-    private async Task<ChallengeResult> GetChallengeAsync()
+    private async Task<ChallengeResult> GetChallengeAsync(CancellationToken cancellationToken = default)
     {
         var parameters = new List<KeyValuePair<string, string>>
         {
@@ -352,7 +357,7 @@ public class SrunPortal
             new("ip", _ip ?? "0.0.0.0")
         };
 
-        var data = await GetJsonAsync("/cgi-bin/get_challenge", parameters, jsonp: true);
+        var data = await GetJsonAsync("/cgi-bin/get_challenge", parameters, jsonp: true, cancellationToken);
 
         if (data.TryGetProperty("challenge", out var challenge))
             return new ChallengeResult { Error = "ok", Challenge = SafeGetString(challenge) };
@@ -360,7 +365,7 @@ public class SrunPortal
         if (data.TryGetProperty("error", out var err) && SafeGetString(err) == "ok")
         {
             // 尝试无 callback 模式
-            var data2 = await GetJsonAsync("/cgi-bin/get_challenge", parameters, jsonp: false);
+            var data2 = await GetJsonAsync("/cgi-bin/get_challenge", parameters, jsonp: false, cancellationToken);
             if (data2.TryGetProperty("challenge", out var challenge2))
                 return new ChallengeResult { Error = "ok", Challenge = SafeGetString(challenge2) };
             return new ChallengeResult { Error = "ok", Challenge = "" };
@@ -368,11 +373,11 @@ public class SrunPortal
 
         throw new InvalidOperationException($"获取 challenge 失败: {data}");
     }
-    public async Task<LoginResult> LoginAsync()
+    public async Task<LoginResult> LoginAsync(CancellationToken cancellationToken = default)
     {
         LogDebug($"[登录] 账号: {_username}, IP: {_ip}, AC_ID: {_acId}");
 
-        var challenge = await GetChallengeAsync();
+        var challenge = await GetChallengeAsync(cancellationToken);
         var token = challenge.Challenge ?? "";
         LogDebug($"[登录] 获取 token: {(token.Length > 8 ? token[..8] : token)}...");
 
@@ -427,13 +432,13 @@ public class SrunPortal
             parameters[2] = new KeyValuePair<string, string>("password", _password);
         }
 
-        var result = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true);
+        var result = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true, cancellationToken);
         return ParseLoginResult(result);
     }
 
-    public async Task<UserInfo> GetUserInfoAsync()
+    public async Task<UserInfo> GetUserInfoAsync(CancellationToken cancellationToken = default)
     {
-        var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true);
+        var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true, cancellationToken);
 
         var userInfo = new UserInfo();
         if (data.TryGetProperty("error", out var e)) userInfo.Error = SafeGetString(e);
@@ -448,17 +453,18 @@ public class SrunPortal
         return userInfo;
     }
 
-    public async Task<DateTime?> GetExpireTimeAsync()
+    public async Task<DateTime?> GetExpireTimeAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            var data = await GetJsonAsync("/v1/srun_portal_expire_time");
+            var data = await GetJsonAsync("/v1/srun_portal_expire_time", cancellationToken);
             if (data.TryGetProperty("code", out var code) && code.GetInt32() == 0 &&
                 data.TryGetProperty("data", out var ts) && ts.GetInt64() is var timestamp && timestamp > 0)
             {
                 return DateTimeOffset.FromUnixTimeSeconds(timestamp).DateTime;
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception e)
         {
             LogDebug($"[诊断] 获取到期时间失败: {e.Message}");
@@ -466,7 +472,7 @@ public class SrunPortal
         return null;
     }
 
-    public async Task<LoginResult> LogoutAsync()
+    public async Task<LoginResult> LogoutAsync(CancellationToken cancellationToken = default)
     {
         var parameters = new List<KeyValuePair<string, string>>
         {
@@ -476,7 +482,7 @@ public class SrunPortal
             new("ac_id", _acId!)
         };
 
-        var data = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true);
+        var data = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true, cancellationToken);
         return ParseLoginResult(data);
     }
 

@@ -738,7 +738,10 @@ public partial class MainForm : Form
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log($"[配置] 加载失败: {ex.Message}");
+        }
     }
 
     private void SetTextBoxIfPlaceholder(TextBox txt, string value)
@@ -794,27 +797,10 @@ public partial class MainForm : Form
                 File.Delete(ConfigPath);
             Log("[配置] 已删除");
         }
-        catch { }
-    }
-
-    private class Config
-    {
-        public string? Url { get; set; }
-        public string? Username { get; set; }
-        public string? Password { get; set; }
-        public string? Ip { get; set; }
-        public string? Domain { get; set; }
-        public string? AcId { get; set; }
-        public bool AutoLogin { get; set; }
-        public LoopConfig? Loop { get; set; }
-    }
-
-    private class LoopConfig
-    {
-        public bool Enable { get; set; }
-        public int Interval { get; set; } = 10;
-        public int Timeout { get; set; } = 3;
-        public string PingHost { get; set; } = "www.baidu.com";
+        catch (Exception ex)
+        {
+            Log($"[配置] 删除失败：{ex.Message}");
+        }
     }
 
     private void ShowHelp()
@@ -857,67 +843,72 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         return string.IsNullOrWhiteSpace(txt.Text) || txt.Text == placeholder;
     }
 
+    private CancellationTokenSource? _cancellationTokenSource;
+
     private async void BtnLogin_Click(object? sender, EventArgs e)
     {
-        var url = GetActualText(_txtUrl, "http://10.0.0.1");
-        var username = GetActualText(_txtUsername);
-        var password = GetActualText(_txtPassword, "");
-        var ip = IsPlaceholder(_txtIp) ? null : _txtIp.Text.Trim();
-        var acId = IsPlaceholder(_txtAcId) ? null : _txtAcId.Text.Trim();
-        var domain = GetActualText(_txtDomain, "");
-
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            MessageBox.Show("请输入网关地址", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(username))
-        {
-            MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(password))
-        {
-            MessageBox.Show("请输入密码", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        if (_chkSaveConfig.Checked)
-            SaveConfig();
-
-        SetButtonsEnabled(false);
-        Log("=== 登录尝试 ===");
-
-        // 用户是否手动指定了 IP 或 AC_ID
-        bool userProvidedIp = !IsPlaceholder(_txtIp);
-        bool userProvidedAcId = !IsPlaceholder(_txtAcId);
-
         try
         {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            var url = GetActualText(_txtUrl, "http://10.0.0.1");
+            var username = GetActualText(_txtUsername);
+            var password = GetActualText(_txtPassword, "");
+            var ip = IsPlaceholder(_txtIp) ? null : _txtIp.Text.Trim();
+            var acId = IsPlaceholder(_txtAcId) ? null : _txtAcId.Text.Trim();
+            var domain = GetActualText(_txtDomain, "");
+
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                MessageBox.Show("请输入网关地址", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                MessageBox.Show("请输入用户名", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                MessageBox.Show("请输入密码", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (_chkSaveConfig.Checked)
+                SaveConfig();
+
+            SetButtonsEnabled(false);
+            Log("=== 登录尝试 ===");
+
+            // 用户是否手动指定了 IP 或 AC_ID
+            bool userProvidedIp = !IsPlaceholder(_txtIp);
+            bool userProvidedAcId = !IsPlaceholder(_txtAcId);
+
             var portal = new SrunPortal(url, username, password, acId, ip, domain);
             portal.DebugLog = LogDebug;
 
             // 如果用户没有提供 IP/AC_ID，先自动检测
             if (!userProvidedIp && !userProvidedAcId)
             {
-                await portal.DetectInfoAsync();
+                await portal.DetectInfoAsync(_cancellationTokenSource.Token);
                 ip = portal.GetDetectedIp();
                 acId = portal.GetDetectedAcId();
                 Log($"自动检测结果 - IP: {ip}, AC_ID: {acId}");
             }
 
-            var result = await portal.LoginAsync();
+            var result = await portal.LoginAsync(_cancellationTokenSource.Token);
             Log($"结果: {result.Error}");
 
             // 如果用户提供了信息但登录失败，尝试自动检测后重试
             if (!result.IsSuccess && (userProvidedIp || userProvidedAcId))
             {
                 Log("使用用户指定参数登录失败，尝试自动检测...");
-                await portal.DetectInfoAsync();
+                await portal.DetectInfoAsync(_cancellationTokenSource.Token);
                 ip = portal.GetDetectedIp();
                 acId = portal.GetDetectedAcId();
                 Log($"自动检测结果 - IP: {ip}, AC_ID: {acId}");
-                result = await portal.LoginAsync();
+                result = await portal.LoginAsync(_cancellationTokenSource.Token);
                 Log($"结果: {result.Error}");
             }
 
@@ -925,7 +916,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             {
                 // 登录成功仅输出日志，不弹窗
                 Log("[登录] 登录成功");
-                await QueryStatus(portal);
+                await QueryStatus(portal, _cancellationTokenSource.Token);
             }
             else
             {
@@ -934,6 +925,10 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
                 Log($"错误：{error}");
             }
         }
+        catch (OperationCanceledException)
+        {
+            Log("[登录] 已取消");
+        }
         catch (Exception ex)
         {
             MessageBox.Show($"错误：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -941,6 +936,8 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         }
         finally
         {
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
             SetButtonsEnabled(true);
         }
     }
@@ -971,6 +968,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         catch (Exception ex)
         {
             Log($"错误：{ex.Message}");
+            MessageBox.Show($"查询失败：{ex.Message}", "错误");
         }
         finally
         {
@@ -1040,7 +1038,10 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             if (info.UserBalance.HasValue)
                 Log($"余额：{info.UserBalance:F2}");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log($"查询用户信息失败: {ex.Message}");
+        }
 
         try
         {
@@ -1048,7 +1049,10 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             if (expire.HasValue)
                 Log($"到期时间：{expire:yyyy-MM-dd HH:mm:ss}");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log($"查询到期时间失败: {ex.Message}");
+        }
 
         Log("");
     }
