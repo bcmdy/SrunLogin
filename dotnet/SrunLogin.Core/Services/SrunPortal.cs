@@ -20,7 +20,10 @@ public class SrunPortal
     private string? _acId;
     private string? _ip;
     private readonly CookieContainer _cookieContainer = new();
-    private readonly HttpClient _httpClient;
+    private static readonly HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(15)
+    };
 
     private static readonly Random Random = new();
     private readonly string[] _acIdCandidates = ["143", "2", "3", "5", "10", "15", "20", "100"];
@@ -38,8 +41,10 @@ public class SrunPortal
 
         // 共享 HttpClient 和 CookieContainer，保持会话一致性
         var handler = new HttpClientHandler { CookieContainer = _cookieContainer };
-        _httpClient = new HttpClient(handler);
-        _httpClient.Timeout = TimeSpan.FromSeconds(15);
+        _httpClient = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
         _httpClient.DefaultRequestHeaders.Add("User-Agent", GetUserAgent());
         _httpClient.DefaultRequestHeaders.Add("Accept", GetAccept());
         _httpClient.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
