@@ -1236,11 +1236,29 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
     private string FormatFlow(long bytes)
     {
-        return Formatters.FormatFlow(bytes);
+        if (bytes == 0) return "0 B";
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double val = bytes;
+        int idx = 0;
+        while (val >= 1024 && idx < units.Length - 1) { val /= 1024; idx++; }
+        return $"{val:F2} {units[idx]}";
     }
 
     private string FormatTime(long seconds)
     {
-        return Formatters.FormatTime(seconds);
+        if (seconds == 0) return "0 秒";
+        long s = seconds;
+        var parts = new List<string>();
+        long d = s / 86400;
+        s %= 86400;
+        long h = s / 3600;
+        s %= 3600;
+        long m = s / 60;
+        s %= 60;
+        if (d > 0) parts.Add($"{d}天");
+        if (h > 0) parts.Add($"{h}小时");
+        if (m > 0) parts.Add($"{m}分");
+        if (s > 0 || parts.Count == 0) parts.Add($"{s}秒");
+        return string.Join("", parts);
     }
 }
