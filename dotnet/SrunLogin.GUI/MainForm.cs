@@ -803,43 +803,6 @@ public partial class MainForm : Form
         }
     }
 
-    // 使用Core.Models的Config和LoopConfig
-    private void SaveConfig()
-    {
-        try
-        {
-            var dir = Path.GetDirectoryName(ConfigPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-
-            var config = new SrunLogin.Models.Config
-            {
-                Url = GetActualText(_txtUrl, "http://10.0.0.1"),
-                Username = GetActualText(_txtUsername),
-                Password = GetActualText(_txtPassword, ""),
-                Ip = IsPlaceholder(_txtIp) ? "" : _txtIp.Text.Trim(),
-                Domain = GetActualText(_txtDomain, ""),
-                AcId = IsPlaceholder(_txtAcId) ? "" : _txtAcId.Text.Trim(),
-                AutoLogin = _chkAutoLogin.Checked,
-                Loop = new SrunLogin.Models.LoopConfig
-                {
-                    Enable = _chkLoopEnable!.Checked,
-                    Interval = int.TryParse(_txtLoopInterval!.Text, out var interval) ? interval : 60,
-                    Timeout = int.TryParse(_txtLoopTimeout!.Text, out var timeout) ? timeout : 5,
-                    PingHost = _txtPingHost!.Text
-                }
-            };
-
-            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(ConfigPath, json);
-            Log("[配置] 已保存");
-        }
-        catch (Exception ex)
-        {
-            Log($"[配置] 保存失败：{ex.Message}");
-        }
-    }
-
     private void ShowHelp()
     {
         var helpText = @"========== 填写说明 ==========
