@@ -1227,26 +1227,13 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         }
     }
 
-    private static string FormatFlow(long bytes)
+    private string FormatFlow(long bytes)
     {
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        double val = bytes;
-        int idx = 0;
-        while (val >= 1024 && idx < units.Length - 1) { val /= 1024; idx++; }
-        return $"{val:F2} {units[idx]}";
+        return Formatters.FormatFlow(bytes);
     }
 
-    private static string FormatTime(long seconds)
+    private string FormatTime(long seconds)
     {
-        var d = seconds / 86400;
-        var h = (seconds % 86400) / 3600;
-        var m = (seconds % 3600) / 60;
-        var s = seconds % 60;
-        var parts = new List<string>();
-        if (d > 0) parts.Add($"{d}天");
-        if (h > 0) parts.Add($"{h}小时");
-        if (m > 0) parts.Add($"{m}分");
-        if (s > 0 || parts.Count == 0) parts.Add($"{s}秒");
-        return string.Join("", parts);
+        return Formatters.FormatTime(seconds);
     }
 }
