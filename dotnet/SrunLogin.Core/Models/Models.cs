@@ -87,3 +87,29 @@ public class ChallengeResult
     [JsonPropertyName("challenge")]
     public string? Challenge { get; set; }
 }
+
+/// <summary>
+/// 应用配置
+/// </summary>
+public class Config
+{
+    public string? Url { get; set; }
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? Ip { get; set; }
+    public string? Domain { get; set; }
+    public string? AcId { get; set; }
+    public bool AutoLogin { get; set; }
+    public LoopConfig? Loop { get; set; }
+}
+
+/// <summary>
+/// 循环检测配置
+/// </summary>
+public class LoopConfig
+{
+    public bool Enable { get; set; }
+    public int Interval { get; set; } = 10;
+    public int Timeout { get; set; } = 3;
+    public string PingHost { get; set; } = "www.baidu.com";
+}
