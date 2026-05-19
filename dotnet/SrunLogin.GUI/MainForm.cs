@@ -1095,7 +1095,10 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
                 _logWriter?.Write(logLine);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"日志写入失败: {ex.Message}");
+        }
 
         if (level == LogLevel.Info)
         {
