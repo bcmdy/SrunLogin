@@ -1067,6 +1067,21 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
     private enum LogLevel { Info, Debug }
 
+    private static readonly object _logLock = new();
+    private static StreamWriter? _logWriter;
+
+    private void EnsureLogWriter()
+    {
+        lock (_logLock)
+        {
+            if (_logWriter == null || _logWriter.BaseStream.Position > 4096)
+            {
+                _logWriter?.Dispose();
+                _logWriter = new StreamWriter(LogPath, append: true) { AutoFlush = true };
+            }
+        }
+    }
+
     private void Log(string text, LogLevel level = LogLevel.Info)
     {
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
@@ -1074,7 +1089,11 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
         try
         {
-            File.AppendAllText(LogPath, logLine);
+            EnsureLogWriter();
+            lock (_logLock)
+            {
+                _logWriter?.Write(logLine);
+            }
         }
         catch { }
 
@@ -1086,14 +1105,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
     private void LogDebug(string text)
     {
-        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        var logLine = $"[{timestamp}] {text}\n";
-
-        try
-        {
-            File.AppendAllText(LogPath, logLine);
-        }
-        catch { }
+        Log(text, LogLevel.Debug);
     }
 
     private void StartLoopDetection()
