@@ -20,10 +20,8 @@ public class SrunPortal
     private string? _acId;
     private string? _ip;
     private readonly CookieContainer _cookieContainer = new();
-    private static readonly HttpClient _httpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(15)
-    };
+    private readonly CookieContainer _cookieContainer = new();
+    private HttpClient _httpClient;
 
     private static readonly Random Random = new();
     private readonly string[] _acIdCandidates = ["143", "2", "3", "5", "10", "15", "20", "100"];
@@ -206,7 +204,7 @@ public class SrunPortal
             try
             {
                 LogDebug("[诊断] 尝试 JSONP 模式 rad_user_info 获取 IP...");
-                var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true, cancellationToken);
+                var data = await GetJsonAsync("/cgi-bin/rad_user_info", null, true, cancellationToken);
                 if (data.TryGetProperty("client_ip", out var clientIp) && clientIp.ValueKind == JsonValueKind.String)
                     _ip = clientIp.GetString();
                 if (string.IsNullOrEmpty(_ip) && data.TryGetProperty("online_ip", out var onlineIp) && onlineIp.ValueKind == JsonValueKind.String)
@@ -437,13 +435,13 @@ public class SrunPortal
             parameters[2] = new KeyValuePair<string, string>("password", _password);
         }
 
-        var result = await GetJsonAsync("/cgi-bin/srun_portal", parameters, jsonp: true, cancellationToken);
+        var result = await GetJsonAsync("/cgi-bin/srun_portal", parameters, true, cancellationToken);
         return ParseLoginResult(result);
     }
 
     public async Task<UserInfo> GetUserInfoAsync(CancellationToken cancellationToken = default)
     {
-        var data = await GetJsonAsync("/cgi-bin/rad_user_info", jsonp: true, cancellationToken);
+        var data = await GetJsonAsync("/cgi-bin/rad_user_info", null, true, cancellationToken);
 
         var userInfo = new UserInfo();
         if (data.TryGetProperty("error", out var e)) userInfo.Error = SafeGetString(e);
@@ -462,7 +460,7 @@ public class SrunPortal
     {
         try
         {
-            var data = await GetJsonAsync("/v1/srun_portal_expire_time", cancellationToken);
+            var data = await GetJsonAsync("/v1/srun_portal_expire_time", null, false, cancellationToken);
             if (data.TryGetProperty("code", out var code) && code.GetInt32() == 0 &&
                 data.TryGetProperty("data", out var ts) && ts.GetInt64() is var timestamp && timestamp > 0)
             {
