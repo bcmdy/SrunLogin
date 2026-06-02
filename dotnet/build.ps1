@@ -17,11 +17,11 @@ Write-Host ""
 # Clean old files
 Write-Host "Cleaning old files..." -ForegroundColor Yellow
 
-$exePath = Join-Path $OUTPUT_DIR "SrunLogin.GUI.exe"
+$exePath = Join-Path $OUTPUT_DIR "SrunLogin.Wpf.exe"
 if (Test-Path $exePath) {
-    $process = Get-Process -Name "SrunLogin.GUI" -ErrorAction SilentlyContinue
+    $process = Get-Process -Name "SrunLogin.Wpf" -ErrorAction SilentlyContinue
     if ($process) {
-        Stop-Process -Name "SrunLogin.GUI" -Force -ErrorAction SilentlyContinue
+        Stop-Process -Name "SrunLogin.Wpf" -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 500
     }
 }
@@ -48,8 +48,8 @@ for ($i = 0; $i -lt $retryCount; $i++) {
 
 # Build single file exe (framework-dependent)
 Write-Host ""
-Write-Host "Building single file exe..." -ForegroundColor Yellow
-dotnet publish SrunLogin.GUI/SrunLogin.GUI.csproj `
+Write-Host "Building WPF single file exe..." -ForegroundColor Yellow
+dotnet publish SrunLogin.Wpf/SrunLogin.Wpf.csproj `
     -c $CONFIG `
     -p:SelfContained=false `
     -p:PublishSingleFile=true `

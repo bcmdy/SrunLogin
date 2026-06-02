@@ -4,55 +4,64 @@
 
 ## 项目结构
 
-```
+```text
 SrunLogin/
-├── python/           # Python 原版实现
+├── python/                 # Python 原版脚本
 │   ├── login.py
 │   ├── login.bat
 │   ├── getinfo.bat
 │   ├── loginout.bat
 │   └── README.md
-└── dotnet/           # .NET 重构版
-    ├── SrunLogin.csproj
-    ├── Program.cs
-    ├── Crypto/           # 加密算法
-    ├── Models/           # 数据模型
-    ├── Services/         # 认证服务
-    └── Utils/            # 工具类
+└── dotnet/
+    ├── SrunLogin.Core/     # 认证协议、加密、模型和工具类
+    ├── SrunLogin.GUI/      # WinForms 旧版 GUI
+    ├── SrunLogin.Wpf/      # WPF 新版 GUI
+    └── build.ps1           # WPF 发布脚本
 ```
 
 ## 当前实现
 
 ### Python 版
 
-纯 Python 标准库实现，无需安装任何第三方库。
+纯 Python 标准库实现，无需安装第三方库。
 
 ```bash
 python python/login.py login -u 账号 -p 密码 --url http://网关
 ```
 
-### .NET 版
+### .NET WPF 版
 
-.NET 8+ 控制台应用，零外部依赖。
+新版桌面 GUI 使用 WPF 实现，并复用 `SrunLogin.Core` 作为认证核心。
 
-```bash
-dotnet run --project dotnet -- login -u 账号 -p 密码 --url http://网关
+```powershell
+dotnet run --project dotnet\SrunLogin.Wpf\SrunLogin.Wpf.csproj
 ```
 
-或编译后运行：
+发布单文件可执行程序：
 
-```bash
-dotnet publish dotnet -c Release -o ./publish
-./publish/SrunLogin login -u 账号 -p 密码 --url http://网关
+```powershell
+.\dotnet\build.ps1
+```
+
+发布输出位于 `dotnet\publish\`。配置文件 `config.json` 和日志文件 `app.log` 会写入 exe 同级目录。
+
+### .NET WinForms 版
+
+`dotnet\SrunLogin.GUI` 保留为旧版 GUI，主要用于过渡和对照。
+
+```powershell
+dotnet run --project dotnet\SrunLogin.GUI\SrunLogin.GUI.csproj
 ```
 
 ## 功能
 
 - 自动检测 IP 和 AC_ID
-- 登录/登出校园网
+- 登录和注销校园网
 - 查询在线状态（流量、时长、余额）
 - 查询账户到期时间
-- 诊断输出方便排查问题
+- 托盘最小化与右键操作
+- 循环检测网络状态并尝试自动登录
+- 诊断日志输出，便于排查认证问题
 
 ## 协议
 

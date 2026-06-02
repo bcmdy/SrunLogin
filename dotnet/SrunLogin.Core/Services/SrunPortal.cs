@@ -11,7 +11,7 @@ namespace SrunLogin.Services;
 /// <summary>
 /// Srun 门户认证服务（参数顺序严格保持与 Python 原版一致）
 /// </summary>
-public class SrunPortal
+public class SrunPortal : IDisposable
 {
     private readonly string _authUrl;
     private readonly string _username;
@@ -20,10 +20,15 @@ public class SrunPortal
     private string? _acId;
     private string? _ip;
     private readonly CookieContainer _cookieContainer = new();
-    // private readonly CookieContainer _cookieContainer = new();
-    private HttpClient _httpClient;
+    private readonly HttpClientHandler _handler;
+    private readonly HttpClient _httpClient;
+    private bool _disposed;
 
     private static readonly Random Random = new();
+    private static readonly JsonSerializerOptions CompactJsonOptions = new()
+    {
+        WriteIndented = false
+    };
     private readonly string[] _acIdCandidates = ["143", "2", "3", "5", "10", "15", "20", "100"];
 
     public Action<string>? DebugLog { get; set; }
@@ -38,13 +43,14 @@ public class SrunPortal
         _ip = ip;
 
         // 共享 HttpClient 和 CookieContainer，保持会话一致性
-        var handler = new HttpClientHandler { CookieContainer = _cookieContainer };
-        _httpClient = new HttpClient(handler)
+        _handler = new HttpClientHandler { CookieContainer = _cookieContainer };
+        _httpClient = new HttpClient(_handler)
         {
             Timeout = TimeSpan.FromSeconds(15)
         };
         _httpClient.DefaultRequestHeaders.Add("User-Agent", GetUserAgent());
         _httpClient.DefaultRequestHeaders.Add("Accept", GetAccept());
+        _httpClient.DefaultRequestHeaders.Add("Accept-Language", "zh-CN,zh;q=0.9");
         _httpClient.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
     }
 
@@ -415,7 +421,7 @@ public class SrunPortal
                 acid = _acId,
                 enc_ver = "srun_bx1"
             };
-            var infoStr = JsonSerializer.Serialize(infoObj);
+            var infoStr = JsonSerializer.Serialize(infoObj, CompactJsonOptions);
             var encrypted = XXTea.Encrypt(infoStr, token);
             var i = "{SRBX1}" + SrunBase64.Encode(Encoding.Latin1.GetBytes(encrypted));
 
@@ -592,4 +598,15 @@ public class SrunPortal
 
     private static string GetAccept() =>
         "text/javascript, application/javascript, application/ecmascript, application/x-ecmascript, */*; q=0.01";
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _httpClient.Dispose();
+        _handler.Dispose();
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
 }
