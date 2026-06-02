@@ -18,6 +18,7 @@ public partial class MainWindow
         InitializeComponent();
 
         _viewModel = new MainViewModel();
+        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         DataContext = _viewModel;
 
         _notifyIcon = CreateNotifyIcon();
@@ -44,6 +45,18 @@ public partial class MainWindow
             return;
 
         _viewModel.Password = PasswordInput.Password;
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainViewModel.Output))
+            return;
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            OutputBox.CaretIndex = OutputBox.Text.Length;
+            OutputBox.ScrollToEnd();
+        });
     }
 
     private NotifyIcon CreateNotifyIcon()
@@ -109,6 +122,7 @@ public partial class MainWindow
         }
 
         _viewModel.Shutdown();
+        _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
         _notifyIcon.Dispose();
         base.OnClosing(e);
     }
