@@ -291,7 +291,7 @@ public sealed class MainViewModel : ObservableObject
 
     public Task ShowHelpAsync()
     {
-        Output = """
+        var helpText = """
 ========== 填写说明 ==========
 网关地址：校园网认证服务器 URL，通常是 http://10.0.0.1 或 http://192.168.0.1
 用户名：校园网账号，通常是学号或工号
@@ -313,6 +313,8 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 4. 认证加密错误 -> AC ID 不正确，尝试更换
 5. 在线设备超限 -> 先登出其他设备
 """;
+        Log("");
+        Log(helpText);
         return Task.CompletedTask;
     }
 

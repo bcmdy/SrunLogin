@@ -124,6 +124,8 @@
                                  MinHeight="220"
                                  HorizontalAlignment="Stretch"
                                  VerticalAlignment="Stretch"
+                                 HorizontalContentAlignment="Left"
+                                 VerticalContentAlignment="Top"
                                  IsReadOnly="True"
                                  AcceptsReturn="True"
                                  VerticalScrollBarVisibility="Auto"
