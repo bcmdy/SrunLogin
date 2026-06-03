@@ -1,4 +1,5 @@
 using System.Net.NetworkInformation;
+using System.Net;
 using System.Text;
 using System.Windows;
 using SrunLogin.Models;
@@ -229,7 +230,14 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Username))
         {
-            WpfMessageBox.Show("请输入用户名", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ShowValidationErrors(ValidateCommonInputs(requirePassword: false));
+            return;
+        }
+
+        var errors = ValidateCommonInputs(requirePassword: false);
+        if (errors.Count > 0)
+        {
+            ShowValidationErrors(errors);
             return;
         }
 
@@ -256,7 +264,14 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Username))
         {
-            WpfMessageBox.Show("请输入用户名", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ShowValidationErrors(ValidateCommonInputs(requirePassword: false));
+            return;
+        }
+
+        var errors = ValidateCommonInputs(requirePassword: false);
+        if (errors.Count > 0)
+        {
+            ShowValidationErrors(errors);
             return;
         }
 
@@ -396,25 +411,67 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
 
     private bool ValidateLogin()
     {
-        if (string.IsNullOrWhiteSpace(Url))
+        var errors = ValidateCommonInputs(requirePassword: true);
+        if (errors.Count > 0)
         {
-            WpfMessageBox.Show("请输入网关地址", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(Username))
-        {
-            WpfMessageBox.Show("请输入用户名", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(Password))
-        {
-            WpfMessageBox.Show("请输入密码", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ShowValidationErrors(errors);
             return false;
         }
 
         return true;
+    }
+
+    private List<string> ValidateCommonInputs(bool requirePassword)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(Url))
+            errors.Add("请输入网关地址。");
+        else if (!Uri.TryCreate(Url.Trim(), UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            errors.Add("网关地址必须是有效的 HTTP/HTTPS URL。");
+
+        if (string.IsNullOrWhiteSpace(Username))
+            errors.Add("请输入用户名。");
+
+        if (requirePassword && string.IsNullOrWhiteSpace(Password))
+            errors.Add("请输入密码。");
+
+        if (!string.IsNullOrWhiteSpace(AcId) && !int.TryParse(AcId.Trim(), out _))
+            errors.Add("AC ID 必须是数字，或留空自动获取。");
+
+        if (!string.IsNullOrWhiteSpace(Ip) && !IPAddress.TryParse(Ip.Trim(), out _))
+            errors.Add("IP 地址格式不正确，或留空自动获取。");
+
+        if (!int.TryParse(LoopInterval, out var interval) || interval < 5)
+            errors.Add("检测间隔必须是大于等于 5 的整数秒。");
+
+        if (!int.TryParse(LoopTimeout, out var timeout) || timeout < 1)
+            errors.Add("网络超时必须是大于等于 1 的整数秒。");
+
+        if (!IsValidHost(PingHost))
+            errors.Add("Ping 主机必须是有效域名或 IP 地址。");
+
+        return errors;
+    }
+
+    private static bool IsValidHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+            return true;
+
+        host = host.Trim();
+        if (IPAddress.TryParse(host, out _))
+            return true;
+
+        return Uri.CheckHostName(host) is UriHostNameType.Dns or UriHostNameType.IPv4 or UriHostNameType.IPv6;
+    }
+
+    private static void ShowValidationErrors(IReadOnlyCollection<string> errors)
+    {
+        if (errors.Count == 0)
+            return;
+
+        WpfMessageBox.Show(string.Join(Environment.NewLine, errors), "输入检查", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private SrunPortal CreatePortal(bool includePassword)
