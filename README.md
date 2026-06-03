@@ -53,6 +53,14 @@ dotnet run --project dotnet\SrunLogin.Wpf\SrunLogin.Wpf.csproj
 dotnet run --project dotnet\SrunLogin.GUI\SrunLogin.GUI.csproj
 ```
 
+## 测试
+
+Core 迁移对照测试不依赖外部测试框架，使用普通 console 项目执行。测试覆盖自定义 Base64、XXTEA、紧凑 JSON、HMAC-MD5、查询字符串顺序和响应解析。
+
+```powershell
+dotnet run --project dotnet\SrunLogin.Core.Tests\SrunLogin.Core.Tests.csproj
+```
+
 ## 功能
 
 - 自动检测 IP 和 AC_ID

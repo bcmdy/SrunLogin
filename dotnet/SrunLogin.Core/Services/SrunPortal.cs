@@ -1,5 +1,4 @@
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -25,10 +24,6 @@ public class SrunPortal : IDisposable
     private bool _disposed;
 
     private static readonly Random Random = new();
-    private static readonly JsonSerializerOptions CompactJsonOptions = new()
-    {
-        WriteIndented = false
-    };
     private readonly string[] _acIdCandidates = ["143", "2", "3", "5", "10", "15", "20", "100"];
 
     public Action<string>? DebugLog { get; set; }
@@ -80,13 +75,13 @@ public class SrunPortal : IDisposable
             var (html, finalUrl) = await FetchHtmlAsync("/", cancellationToken);
             LogDebug($"[诊断] 首页最终 URL: {finalUrl}");
 
-            var acIdFromHtml = ExtractAcId(html);
+            var acIdFromHtml = SrunProtocol.ExtractAcId(html, LogDebug);
             if (!string.IsNullOrEmpty(acIdFromHtml))
                 _acId = _acId ?? acIdFromHtml;
 
             if (string.IsNullOrEmpty(_ip))
             {
-                var ipFromHtml = ExtractIp(html);
+                var ipFromHtml = SrunProtocol.ExtractIp(html);
                 if (!string.IsNullOrEmpty(ipFromHtml))
                 {
                     _ip = ipFromHtml;
@@ -155,13 +150,13 @@ public class SrunPortal : IDisposable
                     LogDebug($"[诊断] 从 srun_portal_pc URL 提取 ac_id: {_acId}");
                 }
 
-                var acIdFromHtml = ExtractAcId(html);
+                var acIdFromHtml = SrunProtocol.ExtractAcId(html, LogDebug);
                 if (!string.IsNullOrEmpty(acIdFromHtml) && acIdFromHtml != "1")
                     _acId = acIdFromHtml;
 
                 if (string.IsNullOrEmpty(_ip))
                 {
-                    var ipFromHtml = ExtractIp(html);
+                    var ipFromHtml = SrunProtocol.ExtractIp(html);
                     if (!string.IsNullOrEmpty(ipFromHtml))
                     {
                         _ip = ipFromHtml;
@@ -249,22 +244,6 @@ public class SrunPortal : IDisposable
     }
 
     /// <summary>
-    /// 核心修复：使用有序参数列表，确保参数顺序与 Python urllib.parse.urlencode 完全一致
-    /// </summary>
-    private static string BuildQueryString(IEnumerable<KeyValuePair<string, string>> parameters)
-    {
-        var sb = new StringBuilder();
-        foreach (var kv in parameters)
-        {
-            if (sb.Length > 0) sb.Append('&');
-            sb.Append(Uri.EscapeDataString(kv.Key));
-            sb.Append('=');
-            sb.Append(Uri.EscapeDataString(kv.Value));
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>
     /// 统一 GET 请求方法。使用 List<KeyValuePair> 保持参数顺序。
     /// </summary>
     private async Task<JsonElement> GetJsonAsync(string path, List<KeyValuePair<string, string>>? parameters = null, bool jsonp = false, CancellationToken cancellationToken = default)
@@ -282,7 +261,7 @@ public class SrunPortal : IDisposable
 
         var url = _authUrl + path;
         if (orderedParams.Count > 0)
-            url += "?" + BuildQueryString(orderedParams);
+            url += "?" + SrunProtocol.BuildQueryString(orderedParams);
 
         LogDebug($"[诊断] 请求: {url[..Math.Min(130, url.Length)]}...");
 
@@ -292,71 +271,11 @@ public class SrunPortal : IDisposable
 
         var text = await _httpClient.GetStringAsync(url, cancellationToken);
         LogDebug($"[诊断] 响应: {text[..Math.Min(200, text.Length)]}");
-        return ParseResponse(text);
+        return SrunProtocol.ParseResponse(text);
     }
 
     private static string? SafeGetString(JsonElement element) =>
         element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString();
-
-    private JsonElement ParseResponse(string text)
-    {
-        text = text.Trim();
-        if (string.IsNullOrEmpty(text))
-            throw new InvalidOperationException("空响应");
-
-        if (text == "ok")
-            return JsonDocument.Parse("{\"error\":\"ok\"}").RootElement;
-
-        if (text == "not_online_error")
-            return JsonDocument.Parse("{\"error\":\"not_online_error\"}").RootElement;
-
-        if (text == "login_error")
-            return JsonDocument.Parse("{\"error\":\"login_error\"}").RootElement;
-
-        if (text == "bad_request_parameters")
-            return JsonDocument.Parse("{\"error\":\"bad_request_parameters\"}").RootElement;
-
-        if (text.StartsWith("challenge="))
-        {
-            // 修复：Split('=', 1) 在 C# 中只会返回 1 个元素，必须用 2
-            var challenge = text.Split('=', 2)[1];
-            return JsonDocument.Parse($"{{\"error\":\"ok\",\"challenge\":\"{challenge}\"}}").RootElement;
-        }
-
-        // 尝试直接 JSON 解析
-        try
-        {
-            return JsonDocument.Parse(text).RootElement;
-        }
-        catch { }
-
-        // JSONP: jQuery123({...});  使用通用正则匹配，与 Python 一致
-        var jsonpMatch = Regex.Match(text, @"[^(]*\((.*)\)\s*;?\s*$", RegexOptions.Singleline);
-        if (jsonpMatch.Success)
-        {
-            try
-            {
-                return JsonDocument.Parse(jsonpMatch.Groups[1].Value).RootElement;
-            }
-            catch { }
-        }
-
-        // CSV 格式
-        if (text.Contains(',') && !text.StartsWith('<'))
-        {
-            var parts = text.Split(',');
-            return JsonDocument.Parse(JsonSerializer.Serialize(new
-            {
-                error = "ok",
-                user_name = parts.Length > 0 ? parts[0].Trim() : null,
-                online_ip = parts.Length > 8 ? parts[8].Trim() : null,
-                sum_bytes = parts.Length > 6 ? (long.TryParse(parts[6].Trim(), out var sb) ? sb : 0) : 0,
-                sum_seconds = parts.Length > 4 ? (long.TryParse(parts[4].Trim(), out var ss) ? ss : 0) : 0
-            })).RootElement;
-        }
-
-        throw new InvalidOperationException($"无法解析响应: {text[..Math.Min(200, text.Length)]}");
-    }
 
     private async Task<ChallengeResult> GetChallengeAsync(CancellationToken cancellationToken = default)
     {
@@ -410,25 +329,17 @@ public class SrunPortal : IDisposable
         if (!string.IsNullOrEmpty(token))
         {
             // 加密密码
-            var hmd5 = ComputeHmacMd5(token, _password);
+            var hmd5 = SrunProtocol.ComputeHmacMd5(token, _password);
 
             // 加密用户信息
-            var infoObj = new
-            {
-                username = UsernameWithDomain,
-                password = _password,
-                ip = _ip,
-                acid = _acId,
-                enc_ver = "srun_bx1"
-            };
-            var infoStr = JsonSerializer.Serialize(infoObj, CompactJsonOptions);
+            var infoStr = SrunProtocol.BuildLoginInfoJson(UsernameWithDomain, _password, _ip, _acId);
             var encrypted = XXTea.Encrypt(infoStr, token);
             var i = "{SRBX1}" + SrunBase64.Encode(Encoding.Latin1.GetBytes(encrypted));
 
             // 计算签名
             var chkstr = token + UsernameWithDomain + token + hmd5 + token + _acId + token + _ip +
                          token + "200" + token + "1" + token + i;
-            var chksum = ComputeSha1(chkstr);
+            var chksum = SrunProtocol.ComputeSha1(chkstr);
 
             // 按顺序替换占位值
             parameters[2] = new KeyValuePair<string, string>("password", "{MD5}" + hmd5);
@@ -512,85 +423,6 @@ public class SrunPortal : IDisposable
             if (data.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.Number) result.Code = c.GetInt32();
             return result;
         }
-    }
-
-    private string ExtractAcId(string html)
-    {
-        var candidates = new List<string>();
-        var patterns = new[]
-        {
-            @"<<input[^>]*id=[""']ac_id[""'][^>]*value=[""'](\d+)[""']",
-            @"<<input[^>]*value=[""'](\d+)[""'][^>]*id=[""']ac_id[""']",
-            @"var\s+ac_id\s*=\s*['""](\d+)['""]",
-            @"var\s+acid\s*=\s*['""]?(\d+)['""]?",
-            @"[""']?ac_id[""']?\s*:\s*[""']?(\d+)[""']?",
-            @"[""']?acid[""']?\s*:\s*[""']?(\d+)[""']?",
-            @"[?&]ac_id=(\d+)",
-            @"index_(\d+)\.html",
-            @"srun_portal_pc\?ac_id=(\d+)"
-        };
-
-        foreach (var pattern in patterns)
-        {
-            foreach (Match match in Regex.Matches(html, pattern, RegexOptions.IgnoreCase))
-            {
-                if (match.Success)
-                    candidates.Add(match.Groups[1].Value);
-            }
-        }
-
-        if (candidates.Count == 0)
-            return null!;
-
-        // 统计频率，优先选择非 "1" 的值（与 Python Counter 逻辑一致）
-        var counts = candidates.GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count());
-        LogDebug($"[诊断] HTML 中发现 ac_id 候选: {JsonSerializer.Serialize(counts)}");
-
-        var nonOne = counts.Where(c => c.Key != "1").ToList();
-        if (nonOne.Count > 0)
-        {
-            var best = nonOne.OrderByDescending(c => c.Value).First().Key;
-            LogDebug($"[诊断] 选择非默认 ac_id: {best}");
-            return best;
-        }
-        return counts.OrderByDescending(c => c.Value).First().Key;
-    }
-
-    private string ExtractIp(string html)
-    {
-        var patterns = new[]
-        {
-            @"<<input[^>]*id=[""']ip[""'][^>]*value=[""']([\d.]+)[""']",
-            @"<<input[^>]*value=[""']([\d.]+)[""'][^>]*id=[""']ip[""']",
-            @"ip\s*[:=]\s*[""']([\d.]+)[""']",
-            @"userip\s*[:=]\s*[""']([\d.]+)[""']",
-            @"client_ip\s*[:=]\s*[""']([\d.]+)[""']",
-            @"online_ip\s*[:=]\s*[""']([\d.]+)[""']",
-            @"""ip""\s*:\s*""([\d.]+)""",
-            @"""client_ip""\s*:\s*""([\d.]+)""",
-            @"""online_ip""\s*:\s*""([\d.]+)""",
-            @"var\s+ip\s*=\s*[""']?([\d.]+)[""']?"
-        };
-
-        foreach (var pattern in patterns)
-        {
-            var match = Regex.Match(html, pattern);
-            if (match.Success)
-                return match.Groups[1].Value;
-        }
-        return null!;
-    }
-
-    private static string ComputeHmacMd5(string key, string data)
-    {
-        using var hmac = new HMACMD5(Encoding.UTF8.GetBytes(key));
-        return BitConverter.ToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(data))).Replace("-", "").ToLower();
-    }
-
-    private static string ComputeSha1(string data)
-    {
-        using var sha1 = SHA1.Create();
-        return BitConverter.ToString(sha1.ComputeHash(Encoding.UTF8.GetBytes(data))).Replace("-", "").ToLower();
     }
 
     private static string GetUserAgent() =>
