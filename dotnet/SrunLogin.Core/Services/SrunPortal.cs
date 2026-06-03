@@ -28,7 +28,7 @@ public class SrunPortal : IDisposable
 
     public Action<string>? DebugLog { get; set; }
 
-    public SrunPortal(string authUrl, string username, string password, string? acId = null, string? ip = null, string domain = "")
+    public SrunPortal(string authUrl, string username, string password, string? acId = null, string? ip = null, string domain = "", bool ignoreTlsErrors = false)
     {
         _authUrl = authUrl.TrimEnd('/');
         _username = username;
@@ -39,6 +39,8 @@ public class SrunPortal : IDisposable
 
         // 共享 HttpClient 和 CookieContainer，保持会话一致性
         _handler = new HttpClientHandler { CookieContainer = _cookieContainer };
+        if (ignoreTlsErrors)
+            _handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
         _httpClient = new HttpClient(_handler)
         {
             Timeout = TimeSpan.FromSeconds(15)

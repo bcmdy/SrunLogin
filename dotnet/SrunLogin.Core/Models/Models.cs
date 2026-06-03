@@ -100,6 +100,7 @@ public class Config
     public string? Domain { get; set; }
     public string? AcId { get; set; }
     public bool AutoLogin { get; set; }
+    public bool IgnoreTlsErrors { get; set; }
     public LoopConfig? Loop { get; set; }
 }
 

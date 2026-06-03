@@ -31,6 +31,7 @@ public sealed class MainViewModel : ObservableObject
     private string _loopInterval = "10";
     private string _loopTimeout = "3";
     private string _pingHost = "www.baidu.com";
+    private bool _ignoreTlsErrors;
     private string _loopStatus = "状态：未启动";
     private string _output = "";
 
@@ -140,6 +141,12 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _pingHost;
         set => SetProperty(ref _pingHost, value);
+    }
+
+    public bool IgnoreTlsErrors
+    {
+        get => _ignoreTlsErrors;
+        set => SetProperty(ref _ignoreTlsErrors, value);
     }
 
     public string LoopStatus
@@ -349,6 +356,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             Domain = config.Domain ?? "@edu.cn";
             AcId = config.AcId ?? "";
             AutoLogin = config.AutoLogin;
+            IgnoreTlsErrors = config.IgnoreTlsErrors;
 
             if (config.Loop != null)
             {
@@ -378,6 +386,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
                 Domain = Domain.Trim(),
                 AcId = AcId.Trim(),
                 AutoLogin = AutoLogin,
+                IgnoreTlsErrors = IgnoreTlsErrors,
                 Loop = new LoopConfig
                 {
                     Enable = LoopEnabled,
@@ -482,7 +491,8 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
             includePassword ? Password : "",
             string.IsNullOrWhiteSpace(AcId) ? null : AcId.Trim(),
             string.IsNullOrWhiteSpace(Ip) ? null : Ip.Trim(),
-            Domain.Trim());
+            Domain.Trim(),
+            IgnoreTlsErrors);
     }
 
     private async Task QueryStatusAsync(SrunPortal portal)

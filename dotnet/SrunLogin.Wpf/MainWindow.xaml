@@ -154,7 +154,11 @@
                     <TextBox Text="{Binding LoopTimeout, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,14" />
 
                     <TextBlock Text="Ping 主机" Foreground="{StaticResource MutedBrush}" />
-                    <TextBox Text="{Binding PingHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,20" />
+                    <TextBox Text="{Binding PingHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,14" />
+
+                    <CheckBox Content="允许自签名 HTTPS 证书"
+                              IsChecked="{Binding IgnoreTlsErrors}"
+                              Margin="0,0,0,20" />
 
                     <TextBlock Text="循环检测会在网络不可达时尝试重新登录。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" />
                 </StackPanel>

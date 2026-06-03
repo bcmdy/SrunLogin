@@ -45,6 +45,8 @@ dotnet run --project dotnet\SrunLogin.Wpf\SrunLogin.Wpf.csproj
 
 发布输出位于 `dotnet\publish\`。配置文件 `config.json` 和日志文件 `app.log` 会写入 exe 同级目录。
 
+如果校园网认证网关使用自签名 HTTPS 证书，可在 WPF 版“高级功能”中勾选“允许自签名 HTTPS 证书”。该选项默认关闭。
+
 ### .NET WinForms 版
 
 `dotnet\SrunLogin.GUI` 保留为旧版 GUI，主要用于过渡和对照。
