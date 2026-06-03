@@ -7,5 +7,7 @@ publish/
 *.userosscache
 SrunLogin.Core/bin/
 SrunLogin.Core/obj/
-SrunLogin.GUI/bin/
-SrunLogin.GUI/obj/
+SrunLogin.Wpf/bin/
+SrunLogin.Wpf/obj/
+SrunLogin.Core.Tests/bin/
+SrunLogin.Core.Tests/obj/

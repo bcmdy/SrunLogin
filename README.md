@@ -1,37 +1,22 @@
 # SrunLogin 校园网认证工具
 
-多语言实现的校园网登录工具，支持 Dr.COM/SRun 认证系统。
+用于 Dr.COM/SRun 认证系统的 .NET 桌面登录工具。
 
 ## 项目结构
 
 ```text
 SrunLogin/
-├── python/                 # Python 原版脚本
-│   ├── login.py
-│   ├── login.bat
-│   ├── getinfo.bat
-│   ├── loginout.bat
-│   └── README.md
 └── dotnet/
-    ├── SrunLogin.Core/     # 认证协议、加密、模型和工具类
-    ├── SrunLogin.GUI/      # WinForms 旧版 GUI
-    ├── SrunLogin.Wpf/      # WPF 新版 GUI
-    └── build.ps1           # WPF 发布脚本
+    ├── SrunLogin.Core/        # 认证协议、加密、模型和工具类
+    ├── SrunLogin.Core.Tests/  # Core 迁移对照测试
+    ├── SrunLogin.Wpf/         # WPF 主线 GUI
+    ├── build.ps1              # WPF 发布脚本
+    └── 修改建议.md            # 整改记录
 ```
 
-## 当前实现
+## 运行
 
-### Python 版
-
-纯 Python 标准库实现，无需安装第三方库。
-
-```bash
-python python/login.py login -u 账号 -p 密码 --url http://网关
-```
-
-### .NET WPF 版
-
-新版桌面 GUI 使用 WPF 实现，并复用 `SrunLogin.Core` 作为认证核心。目标框架为 .NET 8 LTS，需要安装 .NET 8 Windows Desktop Runtime。
+WPF 版复用 `SrunLogin.Core` 作为认证核心。目标框架为 .NET 8 LTS，需要安装 .NET 8 Windows Desktop Runtime。
 
 ```powershell
 dotnet run --project dotnet\SrunLogin.Wpf\SrunLogin.Wpf.csproj
@@ -46,14 +31,6 @@ dotnet run --project dotnet\SrunLogin.Wpf\SrunLogin.Wpf.csproj
 发布输出位于 `dotnet\publish\`。配置文件 `config.json` 和日志文件 `app.log` 会写入 exe 同级目录。
 
 如果校园网认证网关使用自签名 HTTPS 证书，可在 WPF 版“高级功能”中勾选“允许自签名 HTTPS 证书”。该选项默认关闭。
-
-### .NET WinForms 版
-
-`dotnet\SrunLogin.GUI` 保留为旧版 GUI，主要用于过渡和对照。
-
-```powershell
-dotnet run --project dotnet\SrunLogin.GUI\SrunLogin.GUI.csproj
-```
 
 ## 测试
 
