@@ -31,7 +31,7 @@ python python/login.py login -u 账号 -p 密码 --url http://网关
 
 ### .NET WPF 版
 
-新版桌面 GUI 使用 WPF 实现，并复用 `SrunLogin.Core` 作为认证核心。
+新版桌面 GUI 使用 WPF 实现，并复用 `SrunLogin.Core` 作为认证核心。目标框架为 .NET 8 LTS，需要安装 .NET 8 Windows Desktop Runtime。
 
 ```powershell
 dotnet run --project dotnet\SrunLogin.Wpf\SrunLogin.Wpf.csproj
