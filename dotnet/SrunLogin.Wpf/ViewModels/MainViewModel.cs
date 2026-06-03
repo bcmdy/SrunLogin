@@ -14,6 +14,7 @@ public sealed class MainViewModel : ObservableObject
 {
     private readonly AppConfigService _configService = new();
     private readonly AppLogService _logService = new();
+    private readonly SemaphoreSlim _loopCheckGate = new(1, 1);
     private CancellationTokenSource? _operationCts;
     private CancellationTokenSource? _loopCts;
 
@@ -482,6 +483,7 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
     private async Task RunLoopDetectionAsync(CancellationToken cancellationToken)
     {
         var interval = ParseInt(LoopInterval, 60, 5);
+        var failureCount = 0;
         LoopStatus = $"状态：检测中（{interval}秒）";
         Log("[循环检测] 已启动");
 
@@ -489,65 +491,90 @@ AC ID：认证设备编号，留空自动获取，登录失败可尝试手动指
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(interval), cancellationToken);
-                await PerformLoopCheckAsync(cancellationToken);
+                var backoffSeconds = Math.Min(failureCount * interval, interval * 5);
+                await Task.Delay(TimeSpan.FromSeconds(interval + backoffSeconds), cancellationToken);
+                var success = await PerformLoopCheckAsync(cancellationToken);
+                failureCount = success ? 0 : Math.Min(failureCount + 1, 5);
             }
             catch (OperationCanceledException)
             {
                 break;
+            }
+            catch (Exception ex)
+            {
+                failureCount = Math.Min(failureCount + 1, 5);
+                LoopStatus = "状态：检测异常";
+                Log($"[循环检测] 异常: {ex.Message}");
             }
         }
 
         Log("[循环检测] 已停止");
     }
 
-    private async Task PerformLoopCheckAsync(CancellationToken cancellationToken)
+    private async Task<bool> PerformLoopCheckAsync(CancellationToken cancellationToken)
     {
-        var online = await CheckNetworkOnlineAsync();
-        var interval = ParseInt(LoopInterval, 60, 5);
-
-        if (online)
+        if (!await _loopCheckGate.WaitAsync(0, cancellationToken))
         {
-            LoopStatus = $"状态：在线（{interval}秒）";
-            return;
+            Log("[循环检测] 上一次检查仍在运行，跳过本轮");
+            return true;
         }
 
-        LoopStatus = "状态：网络离线，尝试登录...";
-        Log("[循环检测] 网络离线，尝试自动登录");
-
-        if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
+        try
         {
-            Log("[循环检测] 缺少用户名或密码，跳过自动登录");
-            return;
-        }
+            var online = await CheckNetworkOnlineAsync(cancellationToken);
+            var interval = ParseInt(LoopInterval, 60, 5);
 
-        using var portal = CreatePortal(includePassword: true);
-        portal.DebugLog = LogDebug;
-        await portal.DetectInfoAsync(cancellationToken);
-        var result = await portal.LoginAsync(cancellationToken);
+            if (online)
+            {
+                LoopStatus = $"状态：在线（{interval}秒）";
+                return true;
+            }
 
-        if (result.IsSuccess)
-        {
-            LoopStatus = "状态：登录成功";
-            Log("[循环检测] 登录成功");
-        }
-        else
-        {
+            LoopStatus = "状态：网络离线，尝试登录...";
+            Log("[循环检测] 网络离线，尝试自动登录");
+
+            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
+            {
+                Log("[循环检测] 缺少用户名或密码，跳过自动登录");
+                return false;
+            }
+
+            using var portal = CreatePortal(includePassword: true);
+            portal.DebugLog = LogDebug;
+            await portal.DetectInfoAsync(cancellationToken);
+            var result = await portal.LoginAsync(cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                LoopStatus = "状态：登录成功";
+                Log("[循环检测] 登录成功");
+                return true;
+            }
+
             var error = result.ErrorMsg ?? result.Error ?? "未知错误";
             LoopStatus = "状态：登录失败";
             Log($"[循环检测] 登录失败: {error}");
+            return false;
+        }
+        finally
+        {
+            _loopCheckGate.Release();
         }
     }
 
-    private async Task<bool> CheckNetworkOnlineAsync()
+    private async Task<bool> CheckNetworkOnlineAsync(CancellationToken cancellationToken)
     {
         try
         {
             var timeout = ParseInt(LoopTimeout, 5, 1);
             var host = string.IsNullOrWhiteSpace(PingHost) ? "www.baidu.com" : PingHost.Trim();
             using var ping = new Ping();
-            var reply = await ping.SendPingAsync(host, timeout * 1000);
+            var reply = await ping.SendPingAsync(host, timeout * 1000).WaitAsync(cancellationToken);
             return reply.Status == IPStatus.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
